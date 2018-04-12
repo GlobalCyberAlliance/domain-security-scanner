@@ -1,0 +1,31 @@
+config.yml
+
+# Interim data files.
+#
+online-valid.json
+tldextract.cache
+*.db
+
+# Editor backup files.
+#
+*~
+*.swp
+
+# Random data stuff.
+#
+data
+*.[gx]z
+*-journal
+
+# Go-related stuff.
+#
+pkg
+bin
+site
+
+# Ansible and Vagrant
+#
+*.retry
+.vagrant
+*.log
+Vagrantfile
