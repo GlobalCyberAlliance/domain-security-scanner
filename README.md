@@ -1,4 +1,4 @@
-# DMARC Risk Scanner
+# GCA DMARC Risk Scanner
 The DMARC Risk Scanner can be used to perform scans against domain(s) for DMARC, SPF and DKIM DNS records.  The scan results will provide the raw DNS record for each protocol, if the record exists.  A Web API is also available if organizations would like to perform a single domain scan for DKIM, DMARC and/or SPF at [https://dmarcguide.globalcyberalliance.org](https://dmarcguide.globalcyberalliance.org).
 
 ## Build
