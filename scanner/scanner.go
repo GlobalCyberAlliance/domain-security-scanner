@@ -20,6 +20,7 @@ import (
 	"net"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -170,13 +171,18 @@ func (sc *Scanner) Start(src Source) <-chan *ScanResult {
 
 func (sc *Scanner) start(src Source, ch chan *ScanResult) {
 	defer close(ch)
+
+	var wg sync.WaitGroup
 	for dname := range src.Read() {
 		<-sc.sem
+		wg.Add(1)
 		go func(dname string) {
 			ch <- sc.scan(dname)
 			sc.sem <- struct{}{}
+			wg.Done()
 		}(dname)
 	}
+	wg.Wait()
 }
 
 // Scan allows the caller to use the *Scanner's underlying data structures
