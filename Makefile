@@ -1,4 +1,4 @@
-PROJECT			:= github.com/GlobalCyberAlliance/DMARC-Risk-Scanner
+PROJECT			:= github.com/GlobalCyberAlliance/GCADMARCRiskScanner
 
 DEP				:= $(shell which dep)
 GO				:= $(shell which go)
