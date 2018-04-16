@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GlobalCyberAlliance/DMARC-Risk-Scanner/scanner"
+	"github.com/GlobalCyberAlliance/GCADMARCRiskScanner/scanner"
 
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
