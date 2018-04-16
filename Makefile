@@ -25,10 +25,10 @@ deps: $(DEP)
 clean:
 	-rm -rf bin
 
-test: $(GLIDE)
-	$(GO_TEST) $(shell $(GLIDE) novendor)
+test:
+	$(GO_TEST) ./...
 
-bench: $(GLIDE)
-	$(GO_BENCH) $(shell $(GLIDE) novendor)
+bench:
+	$(GO_BENCH) ./...
 
 .PHONY: deps clean test bench
