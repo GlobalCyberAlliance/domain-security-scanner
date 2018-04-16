@@ -4,7 +4,7 @@ The DMARC Risk Scanner can be used to perform scans against domain(s) for DMARC,
 ## Build
 To build the application run `make` in the root directory. Alternatively use
 
-`go build -o bin/drs github.com/GlobalCyberAlliance/DMARC-Risk-Scanner/cmd/drs`
+`go build -o bin/drs github.com/GlobalCyberAlliance/GCADMARCRiskScanner/cmd/drs`
 
 ## SPF
 Scan a domain for an SPF record.
