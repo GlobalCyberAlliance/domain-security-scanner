@@ -9,11 +9,13 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@master
 
-      - name: Build Binaries
+      - name: Setup Go Environment
         uses: actions/setup-go@v2
         with:
           go-version: '^1.14.4'
-      - run: |
+
+      - name: Build Binaries
+        run: |
           mkdir -p builds/compressed
           go get github.com/mitchellh/gox
           gox --output "builds/drs-{{.OS}}-{{.Arch}}"
@@ -22,6 +24,5 @@ jobs:
 
       - name: Upload Binaries
         run: |
-          HASH=$(git rev-parse --short "$GITHUB_SHA")
           go get github.com/tcnksm/ghr
-          ghr -t ${{ secrets.GITHUB_TOKEN }} -u ${{ github.actor }} -r ${{ github.event.repository.name }} --replace Latest builds/compressed/
+          ghr -t ${{ secrets.GITHUB_TOKEN }} --delete Latest builds/compressed/
