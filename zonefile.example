@@ -1,0 +1,7 @@
+globalcyberalliance.org. IN     SOA    ns-cloud-c1.googledomains.com. admin@globalcyberalliance.org. (
+				2020061201
+				3H
+				1H
+				1W
+				1D)
+	IN	NS	ns-cloud-c1.googledomains.com.

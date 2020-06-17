@@ -1,47 +1,68 @@
 # GCA DMARC Risk Scanner
-The DMARC Risk Scanner can be used to perform scans against domain(s) for DMARC, SPF and DKIM DNS records.  The scan results will provide the raw DNS record for each protocol, if the record exists.  A Web API is also available if organizations would like to perform a single domain scan for DKIM, DMARC and/or SPF at [https://dmarcguide.globalcyberalliance.org](https://dmarcguide.globalcyberalliance.org).
+The DMARC Risk Scanner can be used to perform scans against domains for DKIM, DMARC, and SPF DNS records.  The scan results will provide the raw DNS record for each protocol, if the record exists.  A Web API is also available if organizations would like to perform a single domain scan for DKIM, DMARC or SPF at [https://dmarcguide.globalcyberalliance.org](https://dmarcguide.globalcyberalliance.org).
+
+## Download
+You can download pre-compiled binaries for macOS, Linux and Windows from the [releases](https://github.com/GlobalCyberAlliance/GCADMARCRiskScanner/releases) page.
+
+Alternatively, you can run the binary from within our pre-built Docker image:
+ 
+```shell
+docker run docker.pkg.github.com/globalcyberalliance/gcadmarcriskscanner/gcadmarcriskscanner:latest
+```
 
 ## Build
-To build the application run `make` in the root directory. Alternatively use
 
-`go build -o bin/drs github.com/GlobalCyberAlliance/GCADMARCRiskScanner/cmd/drs`
+To build this application, you'll need [Go](https://golang.org/) installed.
 
-## SPF
-Scan a domain for an SPF record.
+```shell
+git clone https://github.com/GlobalCyberAlliance/GCADMARCRiskScanner.git
+cd GCADMARCRiskScanner
+go build -o drs
+```
 
-`drs spf [domain]`
+This will output a binary called `drs`. You can then move it or use it by running `./drs` (on Unix devices).
 
-## DMARC
-Scan a domain for a DMARC record.
+## Find a Specific Record From a Single Domain
+To scan a domain for a specific type of record (DKIM, DMARC or SPF), run:
 
-`drs dmarc [domain]`
+`drs single [domain] <type>`
 
-## DKIM
-Scan a domain for a DKIM record.
+Example:
 
-`drs dkim [domain] [dkim_selector]`
+`drs single globalcyberalliance.org dkim --selector gca`
 
-## Bulk
-Scan any number of domains for SPF and DMARC records. Defaults to STDIN.
+*Note: You **need** to spcify the `selector` flag if you're querying a DKIM record.*
 
-#### Flags
-`--opendns` Use OpenDNS's nameservers
+## Bulk Scan Domains
 
-`--google` Use Google's nameservers
+Scan any number of domains for DMARC and SPF records. By default, this listens on `STDIN`, meaning you run the command via `drs bulk` and then enter each domain one-by-one.
 
-`--level3` Use Level3's nameservers
+Alternatively, you can specify multiple domains at runtime:
 
-`-n` `--nameservers` Use specific nameservers, in `host[:port]` format; may be specified multiple times
+`drs bulk globalcyberalliance.org github.com google.com`
 
-`-t` `--timeout` Timeout duration for a DNS query
+Or you can provide [RFC 1035](https://tools.ietf.org/html/rfc1035) zone files by piping with the `-z` flag enabled:
 
-`-c` `--concurrent` The number of domains to scan concurrently
+`drs bulk -z < /path/to/zonefile`
 
-`-z` `--zonefile` Input file/pipe contains an RFC 1035 zone file
+See the zonefile.example file in this repo.
 
-`-p` `--progress` Show a progress bar (disabled when reading from STDIN)
+### Flags
+
+`-c` `--concurrent` The number of domains to scan concurrently.
+
+`-d` `--dns` Use one or multiple of our predefined DNS ranges (Cloudflare, Google, Level3, OpenDNS, Quad9).
+
+`-n` `--nameservers` Use one or multiple manually specified nameservers in `host[:port]` format.
+
+`-p` `--progress` Show a progress bar (disabled when reading from STDIN).
+
+`-t` `--timeout` Timeout duration for a DNS query.
+
+`-z` `--zonefile` Pipe a [RFC 1035](https://tools.ietf.org/html/rfc1035) zone file as the input for the bulk command.
 
 ## License
+
 This repository is licensed under the Apache License version 2.0.
 
 Some of the project's dependencies may be under different licenses.
