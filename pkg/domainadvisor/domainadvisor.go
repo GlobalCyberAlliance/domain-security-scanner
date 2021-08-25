@@ -12,11 +12,11 @@ var (
 func CheckAll(dkim string, dmarc string, domain string, mx []string, spf string) (advice map[string][]string) {
 	advice = make(map[string][]string)
 
-	advice["DKIM"] = CheckDKIM(dkim)
-	advice["DMARC"] = CheckDMARC(dmarc)
-	advice["DOMAIN"] = CheckDomain(domain)
-	advice["MX"] = CheckMX(mx)
-	advice["SPF"] = CheckSPF(spf)
+	advice["dkim"] = CheckDKIM(dkim)
+	advice["dmarc"] = CheckDMARC(dmarc)
+	advice["domain"] = CheckDomain(domain)
+	advice["mx"] = CheckMX(mx)
+	advice["spf"] = CheckSPF(spf)
 
 	return advice
 }
