@@ -12,6 +12,7 @@ jobs:
       - name: Build
         uses: actions/setup-go@v2
         with:
-          go-version: '^1.14.4'
+          go-version: '^1.17.0'
       - run: |
-          go build -o drs
+          cd cmd/dss
+          go build -o dss

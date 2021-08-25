@@ -63,19 +63,16 @@ func (src *zonefileSource) Read() <-chan string {
 
 func (src *zonefileSource) read() {
 	defer close(src.ch)
-	for tok := range dns.ParseZone(src.r, "", "") {
-		if tok.Error != nil {
-			// If there was an error parsing this token, just
-			// proceed to the next one.
+
+	z := dns.NewZoneParser(src.r, "", "")
+	z.SetIncludeAllowed(true)
+
+	for tok, ok := z.Next(); ok; _, ok = z.Next() {
+		if tok.Header().Rrtype == dns.TypeNS {
 			continue
 		}
 
-		if tok.RR.Header().Rrtype != dns.TypeNS {
-			// Skip non-NS RRsets.
-			continue
-		}
-
-		name := strings.Trim(tok.RR.Header().Name, ".")
+		name := strings.Trim(tok.Header().Name, ".")
 		if strings.Index(name, ".") == -1 {
 			// We have an NS record that serves as an anchor, and
 			// should skip it.

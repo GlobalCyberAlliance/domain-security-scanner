@@ -28,56 +28,80 @@ import (
 	"github.com/pkg/errors"
 )
 
-type ScanFlag uint
-
 const (
-	ScanDKIM ScanFlag = 1 << iota
-	ScanDMARC
-	ScanSPF
+	DefaultDKIMPrefix  = "v=DKIM1;"
+	DefaultDMARCPrefix = "v=DMARC1;"
+	DefaultSPFPrefix   = "v=spf1 "
 )
+
+var (
+	DKIMPrefix  = DefaultDKIMPrefix
+	DMARCPrefix = DefaultDMARCPrefix
+	SPFPrefix   = DefaultSPFPrefix
+)
+
+type cachedResult struct {
+	Expiry time.Time
+	Result *ScanResult
+}
+
+// Scanner is a type that queries the DNS records for domain names, looking
+// for specific resource records.
+type Scanner struct {
+	// Cache is a simple in-memory cache to reduce external requests from
+	// the scanner.
+	Cache map[string]cachedResult
+
+	// DKIMSelector is used to specify where a DKIM record is hosted for
+	// a specific domain.
+	DKIMSelector string
+
+	// Nameservers is a slice of "host:port" strings of nameservers to
+	// issue queries against.
+	Nameservers []string
+
+	// RecordType determines which queries are run against a provided
+	// domain.
+	RecordType string
+
+	// cacheEnabled specifies whether the scanner should utilize the in-memory
+	// cache or not.
+	cacheEnabled bool
+
+	// cacheMutex prevents concurrent map writes.
+	cacheMutex *sync.Mutex
+
+	// DNS client shared by all goroutines the scanner spawns.
+	dc *dns.Client
+
+	// The index of the last-used nameserver, from the Nameservers slice.
+	//
+	// This field is managed by atomic operations, and should only ever
+	// be referenced by the (*Scanner).GetNS() method.
+	nsidx uint32
+
+	// A channel to use as a semaphore for limiting the number of DNS
+	// queries that can be made concurrently.
+	sem chan struct{}
+}
 
 // ScannerOption defines a functional configuration type for a *Scanner.
 type ScannerOption func(*Scanner) error
 
-// UseNameservers allows the caller to provide a custom set of nameservers for
-// a *Scanner to use. If ns is nil, or zero-length, the *Scanner will use
-// the nameservers specified in /etc/resolv.conf.
-func UseNameservers(ns []string) ScannerOption {
-	return func(s *Scanner) error {
-		// If the provided slice of nameservers is nil, or has a zero
-		// elements, load up /etc/resolv.conf, and get the "nameserver"
-		// directives from there.
-		if ns == nil || len(ns) == 0 {
-			config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
-			if err != nil {
-				return errors.Wrap(err, "open /etc/resolv.conf")
-			}
-			ns = config.Servers[:]
-		}
-
-		// Make sure each of the nameservers is in the "host:port"
-		// format.
-		//
-		// The "dns" package requires that you explicitly state the port
-		// number for the resolvers that get queried.
-		for i := 0; i < len(ns); i++ {
-			if host, port, err := net.SplitHostPort(ns[i]); err != nil {
-				ns[i] = ns[i] + ":53"
-			} else if port == "" {
-				ns[i] = net.JoinHostPort(host, "53")
-			}
-		}
-		s.Nameservers = ns[:]
-		return nil
-	}
-}
-
-// WithTimeout sets the timeout duration of a DNS query.
-func WithTimeout(timeout time.Duration) ScannerOption {
-	return func(s *Scanner) error {
-		s.dc.Timeout = timeout
-		return nil
-	}
+// ScanResult holds the results of scanning a domain's DNS records.
+type ScanResult struct {
+	A        []string      `json:"a,omitempty" yaml:"a,omitempty"`
+	AAAA     []string      `json:"aaaa,omitempty" yaml:"aaaa,omitempty"`
+	CNAME    string        `json:"cname,omitempty" yaml:"cname,omitempty"`
+	Domain   string        `json:"domain" yaml:"domain,omitempty"`
+	SPF      string        `json:"spf,omitempty" yaml:"spf,omitempty"`
+	DMARC    string        `json:"dmarc,omitempty" yaml:"dmarc,omitempty"`
+	DKIM     string        `json:"dkim,omitempty" yaml:"dkim,omitempty"`
+	Duration time.Duration `json:"duration,omitempty" yaml:"duration,omitempty"`
+	Err      error         `json:"-" yaml:"-"`
+	Error    string        `json:"error,omitempty" yaml:"error,omitempty"`
+	MX       []string      `json:"mx,omitempty" yaml:"mx,omitempty"`
+	TXT      []string      `json:"txt,omitempty" yaml:"txt,omitempty"`
 }
 
 // ConcurrentScans sets the number of domains that will be scanned
@@ -98,25 +122,17 @@ func ConcurrentScans(n int) ScannerOption {
 	}
 }
 
-// Scanner is a type that queries the DNS records for domain names, looking
-// for specific resource records.
-type Scanner struct {
-	// Nameservers is a slice of "host:port" strings of nameservers to
-	// issue queries against.
-	Nameservers []string
-
-	// The index of the last-used nameserver, from the Nameservers slice.
-	//
-	// This field is managed by atomic operations, and should only ever
-	// be referenced by the (*Scanner).getNS() method.
-	nsidx uint32
-
-	// DNS client shared by all goroutines the scanner spawns.
-	dc *dns.Client
-
-	// A channel to use as a semaphore for limiting the number of DNS
-	// queries that can be made concurrently.
-	sem chan struct{}
+// UseCache enables domain caching for the scanner. This is a simple
+// implementation, intended to mitigate abuse attempts.
+func UseCache(enable bool) ScannerOption {
+	return func(s *Scanner) error {
+		if enable {
+			s.Cache = make(map[string]cachedResult, 100)
+			s.cacheEnabled = true
+			s.cacheMutex = &sync.Mutex{}
+		}
+		return nil
+	}
 }
 
 // New initializes and returns a new *Scanner.
@@ -143,35 +159,69 @@ func New(options ...ScannerOption) (*Scanner, error) {
 	return s, nil
 }
 
-// ScanResult holds the results of scanning a domain's DNS records.
-type ScanResult struct {
-	Domain   string        `json:"domain"`
-	SPF      string        `json:"spf"`
-	DMARC    string        `json:"dmarc"`
-	DKIM     string        `json:"-"`
-	Duration time.Duration `json:"duration"`
-	Err      error         `json:"-"`
-	Error    string        `json:"error,omitempty"`
+// UseNameservers allows the caller to provide a custom set of nameservers for
+// a *Scanner to use. If ns is nil, or zero-length, the *Scanner will use
+// the nameservers specified in /etc/resolv.conf.
+func UseNameservers(ns []string) ScannerOption {
+	return func(s *Scanner) error {
+		// If the provided slice of nameservers is nil, or has a zero
+		// elements, load up /etc/resolv.conf, and get the "nameserver"
+		// directives from there.
+		if ns == nil || len(ns) == 0 {
+			config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
+			if err != nil {
+				return errors.Wrap(err, "open /etc/resolv.conf")
+			}
+			ns = config.Servers[:]
+		}
+
+		// Make sure each of the nameservers is in the "host:port"
+		// format.
+		//
+		// The "dns" package requires that you explicitly state the port
+		// number for the resolvers that get queried.
+		for i := 0; i < len(ns); i++ {
+			if host, port, err := net.SplitHostPort(ns[i]); err != nil {
+				if strings.Count(ns[i], ":") > 2 && !strings.Contains(ns[i], "[") {
+					ns[i] = "[" + ns[i] + "]" + ":53"
+				} else {
+					ns[i] = ns[i] + ":53"
+				}
+			} else if port == "" {
+				ns[i] = net.JoinHostPort(host, "53")
+			}
+		}
+		s.Nameservers = ns[:]
+		return nil
+	}
+}
+
+// WithTimeout sets the timeout duration of a DNS query.
+func WithTimeout(timeout time.Duration) ScannerOption {
+	return func(s *Scanner) error {
+		s.dc.Timeout = timeout
+		return nil
+	}
 }
 
 // Start consumes domain names from the Source src, scans the domain name's
 // DNS records, and returns a channel of the results.
-func (sc *Scanner) Start(src Source) <-chan *ScanResult {
+func (s *Scanner) Start(src Source) <-chan *ScanResult {
 	results := make(chan *ScanResult)
-	go sc.start(src, results)
+	go s.start(src, results)
 	return results
 }
 
-func (sc *Scanner) start(src Source, ch chan *ScanResult) {
+func (s *Scanner) start(src Source, ch chan *ScanResult) {
 	defer close(ch)
 
 	var wg sync.WaitGroup
 	for dname := range src.Read() {
-		<-sc.sem
+		<-s.sem
 		wg.Add(1)
 		go func(dname string) {
-			ch <- sc.scan(dname)
-			sc.sem <- struct{}{}
+			ch <- s.Scan(dname)
+			s.sem <- struct{}{}
 			wg.Done()
 		}(dname)
 	}
@@ -180,92 +230,72 @@ func (sc *Scanner) start(src Source, ch chan *ScanResult) {
 
 // Scan allows the caller to use the *Scanner's underlying data structures
 // for performing a one-off scan of the given domain name.
-func (sc *Scanner) Scan(name string) *ScanResult {
-	return sc.scan(name)
-}
+func (s *Scanner) Scan(name string) *ScanResult {
+	if s.cacheEnabled {
+		if val, ok := s.Cache[name]; ok {
+			if val.Expiry.Sub(time.Now()) < (time.Second * 60) {
+				return val.Result
+			}
 
-func (sc *Scanner) scan(name string) *ScanResult {
+			s.cacheMutex.Lock()
+			delete(s.Cache, name)
+			s.cacheMutex.Unlock()
+		}
+	}
+
+	var err error
 	res := &ScanResult{Domain: name}
 	start := time.Now()
 
-	if v, err := sc.spf(name); err != nil {
-		res.Err = errors.Wrap(err, "spf")
-	} else {
-		res.SPF = v
-	}
-
-	if v, err := sc.dmarc(name); err != nil {
-		res.Err = errors.Wrap(err, "dmarc")
-	} else {
-		res.DMARC = v
+	switch s.RecordType {
+	case "a":
+		if res.A, err = s.getTypeA(res.Domain); err != nil {
+			res.Err = errors.Wrap(err, "A")
+		}
+	case "aaaa":
+		if res.A, err = s.getTypeAAAA(res.Domain); err != nil {
+			res.Err = errors.Wrap(err, "AAAA")
+		}
+	case "all":
+		if err = s.GetDNSRecords(res, "A", "AAAA", "CNAME", "DKIM", "DMARC", "MX", "SPF", "TXT"); err != nil {
+			res.Err = errors.Wrap(err, "All")
+		}
+	case "cname":
+		if res.CNAME, err = s.getTypeCNAME(res.Domain); err != nil {
+			res.Err = errors.Wrap(err, "CNAME")
+		}
+	case "mx":
+		if res.MX, err = s.getTypeMX(res.Domain); err != nil {
+			res.Err = errors.Wrap(err, "MX")
+		}
+	case "txt":
+		if res.MX, err = s.getTypeTXT(res.Domain); err != nil {
+			res.Err = errors.Wrap(err, "TXT")
+		}
+	default:
+		// case "sec"
+		if err = s.GetDNSRecords(res, "DKIM", "DMARC", "MX", "SPF"); err != nil {
+			res.Err = errors.Wrap(err, "All")
+		}
 	}
 
 	res.Duration = time.Since(start)
 	if res.Err != nil {
 		res.Error = res.Err.Error()
 	}
+
+	if s.cacheEnabled {
+		s.cacheMutex.Lock()
+		s.Cache[name] = cachedResult{
+			Expiry: time.Now(),
+			Result: res,
+		}
+		s.cacheMutex.Unlock()
+	}
+
 	return res
 }
 
-func (s *Scanner) spf(name string) (string, error) {
-	req := newTXTRequest(name)
-	in, _, err := s.dc.Exchange(req, s.getNS())
-	if err != nil {
-		return "", errors.Wrap(err, "exchange")
-	}
-
-	for _, ans := range in.Answer {
-		t, ok := ans.(*dns.TXT)
-		if !ok {
-			continue
-		}
-		for _, txt := range t.Txt {
-			if strings.HasPrefix(txt, spfPrefix) {
-				return txt, nil
-			}
-		}
-	}
-
-	return "", nil
-}
-
-func (s *Scanner) dmarc(name string) (string, error) {
-	for _, dname := range []string{
-		"_dmarc." + name,
-		name,
-	} {
-		req := newTXTRequest(dname)
-		in, _, err := s.dc.Exchange(req, s.getNS())
-		if err != nil {
-			return "", errors.Wrap(err, "exchange")
-		}
-
-		for _, ans := range in.Answer {
-			t, ok := ans.(*dns.TXT)
-			if !ok {
-				continue
-			}
-			for _, txt := range t.Txt {
-				if strings.HasPrefix(txt, dmarcPrefix) {
-					return txt, nil
-				}
-			}
-		}
-	}
-	return "", nil
-}
-
-const (
-	spfPrefix   = "v=spf1 "
-	dmarcPrefix = "v=DMARC1;"
-)
-
-func (s *Scanner) getNS() string {
+func (s *Scanner) GetNS() string {
 	return s.Nameservers[int(atomic.AddUint32(&s.nsidx, 1))%len(s.Nameservers)]
-}
-
-func newTXTRequest(domain string) *dns.Msg {
-	m := new(dns.Msg)
-	m.SetQuestion(dns.Fqdn(domain), dns.TypeTXT)
-	return m
 }

@@ -12,16 +12,16 @@ jobs:
       - name: Setup Go Environment
         uses: actions/setup-go@v2
         with:
-          go-version: '^1.14.4'
+          go-version: '^1.15.0'
 
       - name: Build Binaries
         run: |
           mkdir -p builds/compressed
           go get github.com/mitchellh/gox
-          gox --output "builds/drs-{{.OS}}-{{.Arch}}" -osarch '!darwin/386 !plan9/386'
-          cd builds
+          cd cmd/dss
+          gox --output "../../builds/hashscan-{{.OS}}-{{.Arch}}" -osarch '!darwin/386 !plan9/386'
+          cd ../../builds
           find . -maxdepth 1 -type f -execdir zip 'compressed/{}.zip' '{}' \;
-
       - name: Upload Binaries
         run: |
           go get github.com/tcnksm/ghr
