@@ -12,7 +12,6 @@ require (
 	github.com/emersion/go-imap v1.0.6
 	github.com/gin-gonic/gin v1.7.3
 	github.com/go-mail/mail/v2 v2.3.0
-	github.com/go-playground/validator/v10 v10.4.1 // indirect
 	github.com/golang/protobuf v1.4.3 // indirect
 	github.com/google/uuid v1.1.4 // indirect
 	github.com/huandu/xstrings v1.3.2 // indirect
@@ -37,8 +36,6 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/vanng822/go-premailer v1.9.0 // indirect
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect
-	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110 // indirect
-	golang.org/x/sys v0.0.0-20210303074136-134d130e1a04 // indirect
 	golang.org/x/text v0.3.5 // indirect
 	golang.org/x/time v0.0.0-20201208040808-7e3f01d25324 // indirect
 	google.golang.org/protobuf v1.25.0 // indirect
@@ -49,16 +46,6 @@ require (
 )
 
 require (
-	github.com/emersion/go-sasl v0.0.0-20191210011802-430746ea8b9b // indirect
-	github.com/gin-contrib/sse v0.1.0 // indirect
-	github.com/go-pkgz/expirable-cache v0.0.3 // indirect
-	github.com/go-playground/locales v0.13.0 // indirect
-	github.com/go-playground/universal-translator v0.17.0 // indirect
-	github.com/gorilla/css v1.0.0 // indirect
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
-	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/ssor/bom v0.0.0-20170718123548-6386211fdfcf // indirect
-	github.com/ugorji/go/codec v1.2.3 // indirect
-	github.com/vanng822/css v0.1.0 // indirect
+	github.com/ugorji/go v1.2.3 // indirect
 )

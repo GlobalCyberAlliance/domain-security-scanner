@@ -168,11 +168,12 @@ func UseNameservers(ns []string) ScannerOption {
 		// elements, load up /etc/resolv.conf, and get the "nameserver"
 		// directives from there.
 		if ns == nil || len(ns) == 0 {
+			ns = []string{"8.8.8.8:53", "8.8.4.4:53", "1.1.1.1:53"}
+
 			config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
-			if err != nil {
-				return errors.Wrap(err, "open /etc/resolv.conf")
+			if err == nil {
+				ns = config.Servers[:]
 			}
-			ns = config.Servers[:]
 		}
 
 		// Make sure each of the nameservers is in the "host:port"
