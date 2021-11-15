@@ -11,5 +11,6 @@ RUN make
 FROM scratch
 
 COPY --from=builder /go/src/github.com/GlobalCyberAlliance/DomainSecurityScanner/bin/dss /dss
+COPY ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
 ENTRYPOINT [ "/dss" ]
