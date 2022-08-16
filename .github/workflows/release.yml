@@ -24,5 +24,5 @@ jobs:
           find . -maxdepth 1 -type f -execdir zip 'compressed/{}.zip' '{}' \;
       - name: Upload Binaries
         run: |
-          go get github.com/tcnksm/ghr
+          go install github.com/tcnksm/ghr@latest
           ghr -t ${{ secrets.GITHUB_TOKEN }} --delete Latest builds/compressed/
