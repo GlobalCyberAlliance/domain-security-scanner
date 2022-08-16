@@ -12,12 +12,12 @@ jobs:
       - name: Setup Go Environment
         uses: actions/setup-go@v2
         with:
-          go-version: '^1.15.0'
+          go-version: '^1.19.0'
 
       - name: Build Binaries
         run: |
           mkdir -p builds/compressed
-          go get github.com/mitchellh/gox
+          go install github.com/mitchellh/gox@latest
           cd cmd/dss
           gox --output "../../builds/dss-{{.OS}}-{{.Arch}}" -osarch '!darwin/386 !plan9/386'
           cd ../../builds
