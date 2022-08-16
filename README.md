@@ -7,7 +7,7 @@ You can download pre-compiled binaries for macOS, Linux and Windows from the [re
 Alternatively, you can run the binary from within our pre-built Docker image:
 
 ```shell
-docker run docker.pkg.github.com/globalcyberalliance/domainsecurityscanner/domainsecurityscanner:latest
+docker run ghcr.io/globalcyberalliance/domainsecurityscanner/domainsecurityscanner:latest
 ```
 
 ## Build
