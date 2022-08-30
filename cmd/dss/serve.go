@@ -1,11 +1,12 @@
 package main
 
 import (
+	"time"
+
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/http"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/mail"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
 	"github.com/spf13/cobra"
-	"time"
 )
 
 func init() {

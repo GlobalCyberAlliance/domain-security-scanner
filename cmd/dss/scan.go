@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/domainadvisor"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/model"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
 	"github.com/spf13/cobra"
-	"os"
-	"strings"
-	"time"
 )
 
 func init() {

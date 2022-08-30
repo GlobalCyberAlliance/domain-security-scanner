@@ -1,6 +1,9 @@
 package mail
 
 import (
+	"strings"
+	"time"
+
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/domainadvisor"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/model"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
@@ -8,8 +11,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cast"
-	"strings"
-	"time"
 )
 
 type Server struct {

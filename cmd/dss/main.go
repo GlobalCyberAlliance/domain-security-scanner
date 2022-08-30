@@ -2,13 +2,14 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/rs/zerolog"
-	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 	"os"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog"
+	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 var (

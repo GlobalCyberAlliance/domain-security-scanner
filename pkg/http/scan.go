@@ -1,11 +1,12 @@
 package http
 
 import (
+	"strings"
+
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/domainadvisor"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/model"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
 	"github.com/gin-gonic/gin"
-	"strings"
 )
 
 type bulkDomainRequest struct {

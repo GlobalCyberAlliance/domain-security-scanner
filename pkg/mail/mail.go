@@ -3,13 +3,14 @@ package mail
 import (
 	"bufio"
 	"errors"
+	"net"
+	"strings"
+
 	"github.com/emersion/go-imap"
 	imapClient "github.com/emersion/go-imap/client"
 	"github.com/go-mail/mail/v2"
 	"github.com/matcornic/hermes/v2"
 	"github.com/spf13/cast"
-	"net"
-	"strings"
 )
 
 type Config struct {
@@ -30,16 +31,14 @@ type FoundMail struct {
 	DKIM    string
 }
 
-var (
-	MailInfo = hermes.Hermes{
-		Product: hermes.Product{
-			Copyright: "Global Cyber Alliance",
-			Name:      "Domain Security Scanner",
-			Link:      "",
-			Logo:      "https://www.globalcyberalliance.org/wp-content/uploads/Global-Cyber-Alliance-GCA-Logo-Full-Color.png",
-		},
-	}
-)
+var MailInfo = hermes.Hermes{
+	Product: hermes.Product{
+		Copyright: "Global Cyber Alliance",
+		Name:      "Domain Security Scanner",
+		Link:      "",
+		Logo:      "https://www.globalcyberalliance.org/wp-content/uploads/Global-Cyber-Alliance-GCA-Logo-Full-Color.png",
+	},
+}
 
 // GetMail returns the most recent mail found within the logged-in user's mailbox
 func (s *Server) GetMail() (map[string]FoundMail, error) {

@@ -3,11 +3,12 @@ package http
 import (
 	"encoding/json"
 	"errors"
-	"github.com/gin-gonic/gin"
-	"github.com/spf13/cast"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/spf13/cast"
 )
 
 func Decode(c *gin.Context, object interface{}) error {

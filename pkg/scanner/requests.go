@@ -1,9 +1,10 @@
 package scanner
 
 import (
+	"strings"
+
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
-	"strings"
 )
 
 func (s *Scanner) getDNSAnswers(domain string, recordType uint16) ([]dns.RR, error) {

@@ -3,6 +3,10 @@ package http
 import (
 	"encoding/json"
 	"fmt"
+	"net"
+	"net/http"
+	"time"
+
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
 	"github.com/didip/tollbooth/v6"
 	"github.com/didip/tollbooth/v6/limiter"
@@ -10,9 +14,6 @@ import (
 	"github.com/rs/cors"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cast"
-	"net"
-	"net/http"
-	"time"
 )
 
 // Server represents an HTTP server. It is meant to wrap all HTTP functionality
