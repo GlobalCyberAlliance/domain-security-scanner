@@ -20,6 +20,7 @@ cd DomainSecurityScanner
 make
 ```
 
+
 This will output a binary called `dss`. You can then move it or use it by running `./bin/dss` (on Unix devices).
 
 ## Find a Specific Record From a Single Domain
