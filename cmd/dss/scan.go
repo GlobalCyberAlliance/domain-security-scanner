@@ -16,11 +16,6 @@ func init() {
 	cmd.AddCommand(cmdScan)
 }
 
-type scanResultWithAdvice struct {
-	*scanner.ScanResult
-	Advice map[string][]string `json:"advice"`
-}
-
 var (
 	cache  bool
 	format string

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
-	"github.com/didip/tollbooth/v6"
-	"github.com/didip/tollbooth/v6/limiter"
+	"github.com/didip/tollbooth/v7"
+	"github.com/didip/tollbooth/v7/limiter"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/cors"
 	"github.com/rs/zerolog"
