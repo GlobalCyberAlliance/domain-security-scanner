@@ -101,11 +101,11 @@ type (
 		DMARC    string        `json:"dmarc,omitempty" yaml:"dmarc,omitempty"`
 		DKIM     string        `json:"dkim,omitempty" yaml:"dkim,omitempty"`
 		SPF      string        `json:"spf,omitempty" yaml:"spf,omitempty"`
+		MX       []string      `json:"mx,omitempty" yaml:"mx,omitempty"`
+		TXT      []string      `json:"txt,omitempty" yaml:"txt,omitempty"`
 		Duration time.Duration `json:"duration,omitempty" yaml:"duration,omitempty"`
 		Err      error         `json:"-" yaml:"-"`
 		Error    string        `json:"error,omitempty" yaml:"error,omitempty"`
-		MX       []string      `json:"mx,omitempty" yaml:"mx,omitempty"`
-		TXT      []string      `json:"txt,omitempty" yaml:"txt,omitempty"`
 	}
 )
 
