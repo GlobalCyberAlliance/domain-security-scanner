@@ -57,29 +57,42 @@ You can then get a single domain's results by submitting a GET request like this
 
 ```json
 {
+  "scanResult": {
     "domain": "globalcyberalliance.org",
-    "spf": "v=spf1 include:_u.globalcyberalliance.org._spf.smart.ondmarc.com -all",
+    "bimi": "v=BIMI1;l=https://bimi.entrust.net/globalcyberalliance.org/logo.svg;a=https://bimi.entrust.net/globalcyberalliance.org/certchain.pem",
     "dmarc": "v=DMARC1; p=reject; fo=1; rua=mailto:3941b663@inbox.ondmarc.com,mailto:2zw1qguv@ag.dmarcian.com,mailto:dmarc_agg@vali.email; ruf=mailto:2zw1qguv@fr.dmarcian.com,mailto:gca-ny-sc@globalcyberalliance.org;",
-    "dkim": "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCqPnV7+e5SuK77YHtzO815h/qofRr/ZCnCzER9CnHQX3HXfmVrhWoCMG6p4HpWVN1uZhsuqMdeOtwzh4DCvlb2D7BDoQAbTUdb9tEZ1sY4pOqUgYfjVLmJXztN8HfLj2fbqvOZEnUPNNHb4RGouSFUBpLsTMTCodIfF/xSZfGNZQIDAQAB",
-    "duration": 2174200,
+    "dkim": "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCrLHiExVd55zd/IQ/J/mRwSRMAocV/hMB3jXwaHH36d9NaVynQFYV8NaWi69c1veUtRzGt7yAioXqLj7Z4TeEUoOLgrKsn8YnckGs9i3B3tVFB+Ch/4mPhXWiNfNdynHWBcPcbJ8kjEQ2U8y78dHZj1YeRXXVvWob2OaKynO8/lQIDAQAB;",
+    "spf": "v=spf1 include:_u.globalcyberalliance.org._spf.smart.ondmarc.com -all",
+    "duration": 458274508,
     "mx": [
       "aspmx.l.google.com.",
-      "alt4.aspmx.l.google.com.",
+      "alt1.aspmx.l.google.com.",
       "alt2.aspmx.l.google.com.",
       "alt3.aspmx.l.google.com.",
-      "alt1.aspmx.l.google.com."
+      "alt4.aspmx.l.google.com."
+    ]
+  },
+  "advice": {
+    "bimi": [
+      "Your SVG logo could not be downloaded.",
+      "Your VMC certificate could not be downloaded."
     ],
-    "advice": {
     "dkim": [
       "DKIM is setup for this email server. However, if you have other 3rd party systems, please send a test email to confirm DKIM is setup properly."
     ],
     "dmarc": [
       "You are at the highest level! Please make sure to continue reviewing the reports and make the appropriate adjustments, if needed."
     ],
-    "domain": null,
-    "mx": null,
-    "spf": null
-    }
+    "domain": [
+      "Your domain is using TLS 1.3, no further action needed!"
+    ],
+    "mx": [
+      "All of your domains are using TLS 1.3, no further action needed!"
+    ],
+    "spf": [
+      "SPF seems to be setup correctly! No further action needed."
+    ]
+  }
 }
 ```
 
@@ -98,52 +111,77 @@ Which will return a JSON response like this:
 
 ```json
 [
-  {
-    "domain": "globalcyberalliance.org",
-    "spf": "v=spf1 include:_u.globalcyberalliance.org._spf.smart.ondmarc.com -all",
-    "dmarc": "v=DMARC1; p=reject; fo=1; rua=mailto:3941b663@inbox.ondmarc.com,mailto:2zw1qguv@ag.dmarcian.com,mailto:dmarc_agg@vali.email; ruf=mailto:2zw1qguv@fr.dmarcian.com,mailto:gca-ny-sc@globalcyberalliance.org;",
-    "dkim": "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCqPnV7+e5SuK77YHtzO815h/qofRr/ZCnCzER9CnHQX3HXfmVrhWoCMG6p4HpWVN1uZhsuqMdeOtwzh4DCvlb2D7BDoQAbTUdb9tEZ1sY4pOqUgYfjVLmJXztN8HfLj2fbqvOZEnUPNNHb4RGouSFUBpLsTMTCodIfF/xSZfGNZQIDAQAB",
-    "duration": 17322000,
-    "mx": [
-      "aspmx.l.google.com.",
-      "alt4.aspmx.l.google.com.",
-      "alt2.aspmx.l.google.com.",
-      "alt3.aspmx.l.google.com.",
-      "alt1.aspmx.l.google.com."
-    ],
-    "advice": {
-      "DKIM": [
-        "DKIM is setup for this email server. However, if you have other 3rd party systems, please send a test email to confirm DKIM is setup properly."
-      ],
-      "DMARC": [
-        "You are at the highest level! Please make sure to continue reviewing the reports and make the appropriate adjustments, if needed."
-      ],
-      "DOMAIN": null,
-      "MX": null,
-      "SPF": null
-    }
-  },
-  {
-    "domain": "gcatoolkit.org",
-    "spf": "v=spf1 -all",
-    "dmarc": "v=DMARC1; p=reject;",
-    "duration": 77997100,
-    "mx": [
-      "mx00.1and1.com.",
-      "mx01.1and1.com."
-    ],
-    "advice": {
-      "DKIM": [
-        "We couldn't detect any active DKIM record for your domain. Please visit https://dmarcguide.globalcyberalliance.org to fix this."
-      ],
-      "DMARC": [
-        "You are at the highest level! However, we do recommend keeping reports enabled (via the rua tag) in case any issues may arise and you can review reports to see if DMARC is the cause."
-      ],
-      "DOMAIN": null,
-      "MX": null,
-      "SPF": null
-    }
-  }
+	{
+		"scanResult": {
+			"domain": "globalcyberalliance.org",
+			"bimi": "v=BIMI1;l=https://bimi.entrust.net/globalcyberalliance.org/logo.svg;a=https://bimi.entrust.net/globalcyberalliance.org/certchain.pem",
+			"dmarc": "v=DMARC1; p=reject; fo=1; rua=mailto:3941b663@inbox.ondmarc.com,mailto:2zw1qguv@ag.dmarcian.com,mailto:dmarc_agg@vali.email; ruf=mailto:2zw1qguv@fr.dmarcian.com,mailto:gca-ny-sc@globalcyberalliance.org;",
+			"dkim": "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCrLHiExVd55zd/IQ/J/mRwSRMAocV/hMB3jXwaHH36d9NaVynQFYV8NaWi69c1veUtRzGt7yAioXqLj7Z4TeEUoOLgrKsn8YnckGs9i3B3tVFB+Ch/4mPhXWiNfNdynHWBcPcbJ8kjEQ2U8y78dHZj1YeRXXVvWob2OaKynO8/lQIDAQAB;",
+			"spf": "v=spf1 include:_u.globalcyberalliance.org._spf.smart.ondmarc.com -all",
+			"duration": 412142010,
+			"mx": [
+				"aspmx.l.google.com.",
+				"alt1.aspmx.l.google.com.",
+				"alt2.aspmx.l.google.com.",
+				"alt3.aspmx.l.google.com.",
+				"alt4.aspmx.l.google.com."
+			]
+		},
+		"advice": {
+			"bimi": [
+				"Your SVG logo could not be downloaded.",
+				"Your VMC certificate could not be downloaded."
+			],
+			"dkim": [
+				"DKIM is setup for this email server. However, if you have other 3rd party systems, please send a test email to confirm DKIM is setup properly."
+			],
+			"dmarc": [
+				"You are at the highest level! Please make sure to continue reviewing the reports and make the appropriate adjustments, if needed."
+			],
+			"domain": [
+				"Your domain is using TLS 1.3, no further action needed!"
+			],
+			"mx": [
+				"All of your domains are using TLS 1.3, no further action needed!"
+			],
+			"spf": [
+				"SPF seems to be setup correctly! No further action needed."
+			]
+		}
+	},
+	{
+		"scanResult": {
+			"domain": "gcatoolkit.org",
+			"dmarc": "v=DMARC1; p=reject;",
+			"spf": "v=spf1 -all",
+			"duration": 1352755259,
+			"mx": [
+				"mx01.1and1.com.",
+				"mx00.1and1.com."
+			]
+		},
+		"advice": {
+			"bimi": [
+				"We couldn't detect any active BIMI record for your domain. Please visit https://dmarcguide.globalcyberalliance.org to fix this."
+			],
+			"dkim": [
+				"We couldn't detect any active DKIM record for your domain. Please visit https://dmarcguide.globalcyberalliance.org to fix this."
+			],
+			"dmarc": [
+				"You are at the highest level! However, we do recommend keeping reports enabled (via the rua tag) in case any issues may arise and you can review reports to see if DMARC is the cause."
+			],
+			"domain": [
+				"Your domain is using TLS 1.3, no further action needed!"
+			],
+			"mx": [
+				"mx01.1and1.com: Failed to reach domain",
+				"mx00.1and1.com: Failed to reach domain"
+			],
+			"spf": [
+				"SPF seems to be setup correctly! No further action needed."
+			]
+		}
+	}
 ]
 ```
 
@@ -158,12 +196,17 @@ dss serve mail --inboundHost "imap.gmail.com:993" --inboundPass "SomePassword" -
 You can then email this inbox from any address, and you'll receive an email back with your scan results.
 
 ### Flags
+`-a` `--advise` Enables advice for all records
+
+`--cache` Enables DNS cache (60 seconds)
+
+`--checkTls` Enables TLS checks for the root domain, as well as all mail servers
 
 `-c` `--concurrent` The number of domains to scan concurrently (default 12)
 
 `-d` `--dkimSelector` Specify a DKIM selector (default "x").
 
-`-f` `--format` Format to print results in (human, json) (default "human").
+`-f` `--format` Format to print results in (json, jsonp, yaml) (default "yaml").
 
 `-n` `--nameservers` Use specific nameservers, in host[:port] format; may be specified multiple times.
 
