@@ -1,12 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/domainadvisor"
+	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/domain_advisor"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/model"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
 	"github.com/spf13/cobra"
@@ -56,12 +55,15 @@ var (
 			sc.RecordType = recordType
 
 			for result := range sc.Start(source) {
-				advice := domainadvisor.CheckAll(result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF)
-				printToConsole(model.ScanResultWithAdvice{
-					ScanResult: result,
-					Advice:     advice,
-				})
-				fmt.Println("")
+				if advise {
+					advice := domainAdvisor.CheckAll(result.BIMI, result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF, checkTls)
+					printToConsole(model.ScanResultWithAdvice{
+						ScanResult: result,
+						Advice:     advice,
+					})
+				} else {
+					printToConsole(result)
+				}
 			}
 		},
 	}

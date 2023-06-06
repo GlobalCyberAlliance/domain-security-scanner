@@ -3,7 +3,7 @@ package http
 import (
 	"strings"
 
-	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/domainadvisor"
+	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/domain_advisor"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/model"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
 	"github.com/gin-gonic/gin"
@@ -30,7 +30,7 @@ func (s *Server) handleScanDomain(c *gin.Context) {
 	}
 
 	result := s.Scanner.Scan(domain)
-	advice := domainadvisor.CheckAll(result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF)
+	advice := domainAdvisor.CheckAll(result.BIMI, result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF, s.CheckTls)
 
 	resultWithAdvice := model.ScanResultWithAdvice{
 		ScanResult: result,
@@ -69,7 +69,7 @@ func (s *Server) handleScanDomains(c *gin.Context) {
 	var resultsWithAdvice []model.ScanResultWithAdvice
 
 	for result := range s.Scanner.Start(source) {
-		advice := domainadvisor.CheckAll(result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF)
+		advice := domainAdvisor.CheckAll(result.BIMI, result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF, s.CheckTls)
 		resultsWithAdvice = append(resultsWithAdvice, model.ScanResultWithAdvice{
 			ScanResult: result,
 			Advice:     advice,

@@ -13,23 +13,25 @@ import (
 	"github.com/spf13/cast"
 )
 
-type Config struct {
-	Inbound struct {
-		Host string `json:"host"`
-		Pass string `json:"pass"`
-		User string `json:"user"`
-	} `json:"inbound"`
-	Outbound struct {
-		Host string `json:"host"`
-		Pass string `json:"pass"`
-		User string `json:"user"`
-	} `json:"outbound"`
-}
+type (
+	Config struct {
+		Inbound struct {
+			Host string `json:"host"`
+			Pass string `json:"pass"`
+			User string `json:"user"`
+		} `json:"inbound"`
+		Outbound struct {
+			Host string `json:"host"`
+			Pass string `json:"pass"`
+			User string `json:"user"`
+		} `json:"outbound"`
+	}
 
-type FoundMail struct {
-	Address string
-	DKIM    string
-}
+	FoundMail struct {
+		Address string
+		DKIM    string
+	}
+)
 
 var MailInfo = hermes.Hermes{
 	Product: hermes.Product{
@@ -46,7 +48,6 @@ func (s *Server) GetMail() (map[string]FoundMail, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	defer client.Logout()
 
 	mailbox, err := client.Select("INBOX", false)
@@ -101,7 +102,6 @@ func (s *Server) GetMail() (map[string]FoundMail, error) {
 			dkim = strings.ReplaceAll(dkim, ";", "; ")
 		}
 
-		// GENERAL
 		addresses[msg.Envelope.From[0].HostName] = FoundMail{
 			Address: msg.Envelope.From[0].Address(),
 			DKIM:    dkim,

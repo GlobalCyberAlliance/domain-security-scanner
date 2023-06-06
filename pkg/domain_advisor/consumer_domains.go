@@ -1,4 +1,4 @@
-package domainadvisor
+package domainAdvisor
 
 var (
 	consumerDomainList = []string{

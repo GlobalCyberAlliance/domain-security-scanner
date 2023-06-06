@@ -4,8 +4,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/domainadvisor"
-	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/model"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -17,6 +15,7 @@ type Server struct {
 	config   Config
 	interval time.Duration
 	logger   zerolog.Logger
+	CheckTls bool
 	Scanner  *scanner.Scanner
 }
 
@@ -32,7 +31,6 @@ func NewMailServer(config Config, logger zerolog.Logger, sc *scanner.Scanner) (*
 	if err != nil {
 		return nil, err
 	}
-
 	defer client.Logout()
 
 	return &s, nil
@@ -70,22 +68,14 @@ func (s *Server) handler() error {
 			sourceDomainList := strings.NewReader(strings.Join(domainList, "\n"))
 			source := scanner.TextSource(sourceDomainList)
 
-			var resultsWithAdvice []model.ScanResultWithAdvice
-
 			for result := range s.Scanner.Start(source) {
-				advice := domainadvisor.CheckAll(result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF)
-				resultsWithAdvice = append(resultsWithAdvice, model.ScanResultWithAdvice{
-					ScanResult: result,
-					Advice:     advice,
-				})
-
 				sender := addresses[result.Domain].Address
 
 				if addresses[result.Domain].DKIM != "" {
 					result.DKIM = addresses[result.Domain].DKIM
 				}
 
-				if err = s.SendMail(sender, PrepareEmail(result)); err != nil {
+				if err = s.SendMail(sender, s.PrepareEmail(result)); err != nil {
 					log.Error().Err(err).Msg("An error occurred while sending scan results to " + sender)
 					continue
 				}

@@ -27,10 +27,9 @@ type Server struct {
 	server  *http.Server
 	router  *gin.Engine
 
-	Routes *gin.RouterGroup
-
-	// Bind address & domain for the server's listener.
-	Addr string
+	Addr     string
+	CheckTls bool
+	Routes   *gin.RouterGroup
 
 	// Services used by the various HTTP routes.
 	Scanner *scanner.Scanner

@@ -29,80 +29,85 @@ import (
 )
 
 const (
+	DefaultBIMIPrefix  = "v=BIMI1;"
 	DefaultDKIMPrefix  = "v=DKIM1;"
 	DefaultDMARCPrefix = "v=DMARC1;"
 	DefaultSPFPrefix   = "v=spf1 "
 )
 
 var (
+	BIMIPrefix  = DefaultBIMIPrefix
 	DKIMPrefix  = DefaultDKIMPrefix
 	DMARCPrefix = DefaultDMARCPrefix
 	SPFPrefix   = DefaultSPFPrefix
 )
 
-type cachedResult struct {
-	Expiry time.Time
-	Result *ScanResult
-}
+type (
+	cachedResult struct {
+		Expiry time.Time
+		Result *ScanResult
+	}
 
-// Scanner is a type that queries the DNS records for domain names, looking
-// for specific resource records.
-type Scanner struct {
-	// Cache is a simple in-memory cache to reduce external requests from
-	// the scanner.
-	Cache map[string]cachedResult
+	// Scanner is a type that queries the DNS records for domain names, looking
+	// for specific resource records.
+	Scanner struct {
+		// Cache is a simple in-memory cache to reduce external requests from
+		// the scanner.
+		Cache map[string]cachedResult
 
-	// DKIMSelector is used to specify where a DKIM record is hosted for
-	// a specific domain.
-	DKIMSelector string
+		// DKIMSelector is used to specify where a DKIM record is hosted for
+		// a specific domain.
+		DKIMSelector string
 
-	// Nameservers is a slice of "host:port" strings of nameservers to
-	// issue queries against.
-	Nameservers []string
+		// Nameservers is a slice of "host:port" strings of nameservers to
+		// issue queries against.
+		Nameservers []string
 
-	// RecordType determines which queries are run against a provided
-	// domain.
-	RecordType string
+		// RecordType determines which queries are run against a provided
+		// domain.
+		RecordType string
 
-	// cacheEnabled specifies whether the scanner should utilize the in-memory
-	// cache or not.
-	cacheEnabled bool
+		// cacheEnabled specifies whether the scanner should utilize the in-memory
+		// cache or not.
+		cacheEnabled bool
 
-	// cacheMutex prevents concurrent map writes.
-	cacheMutex *sync.Mutex
+		// cacheMutex prevents concurrent map writes.
+		cacheMutex *sync.Mutex
 
-	// DNS client shared by all goroutines the scanner spawns.
-	dc *dns.Client
+		// DNS client shared by all goroutines the scanner spawns.
+		dc *dns.Client
 
-	// The index of the last-used nameserver, from the Nameservers slice.
-	//
-	// This field is managed by atomic operations, and should only ever
-	// be referenced by the (*Scanner).GetNS() method.
-	nsidx uint32
+		// The index of the last-used nameserver, from the Nameservers slice.
+		//
+		// This field is managed by atomic operations, and should only ever
+		// be referenced by the (*Scanner).GetNS() method.
+		nsidx uint32
 
-	// A channel to use as a semaphore for limiting the number of DNS
-	// queries that can be made concurrently.
-	sem chan struct{}
-}
+		// A channel to use as a semaphore for limiting the number of DNS
+		// queries that can be made concurrently.
+		sem chan struct{}
+	}
 
-// ScannerOption defines a functional configuration type for a *Scanner.
-type ScannerOption func(*Scanner) error
+	// ScannerOption defines a functional configuration type for a *Scanner.
+	ScannerOption func(*Scanner) error
 
-// ScanResult holds the results of scanning a domain's DNS records.
-type ScanResult struct {
-	A        []string      `json:"a,omitempty" yaml:"a,omitempty"`
-	AAAA     []string      `json:"aaaa,omitempty" yaml:"aaaa,omitempty"`
-	CNAME    string        `json:"cname,omitempty" yaml:"cname,omitempty"`
-	Domain   string        `json:"domain" yaml:"domain,omitempty"`
-	SPF      string        `json:"spf,omitempty" yaml:"spf,omitempty"`
-	DMARC    string        `json:"dmarc,omitempty" yaml:"dmarc,omitempty"`
-	DKIM     string        `json:"dkim,omitempty" yaml:"dkim,omitempty"`
-	Duration time.Duration `json:"duration,omitempty" yaml:"duration,omitempty"`
-	Err      error         `json:"-" yaml:"-"`
-	Error    string        `json:"error,omitempty" yaml:"error,omitempty"`
-	MX       []string      `json:"mx,omitempty" yaml:"mx,omitempty"`
-	TXT      []string      `json:"txt,omitempty" yaml:"txt,omitempty"`
-}
+	// ScanResult holds the results of scanning a domain's DNS records.
+	ScanResult struct {
+		Domain   string        `json:"domain" yaml:"domain,omitempty"`
+		A        []string      `json:"a,omitempty" yaml:"a,omitempty"`
+		AAAA     []string      `json:"aaaa,omitempty" yaml:"aaaa,omitempty"`
+		BIMI     string        `json:"bimi,omitempty" yaml:"bimi,omitempty"`
+		CNAME    string        `json:"cname,omitempty" yaml:"cname,omitempty"`
+		DMARC    string        `json:"dmarc,omitempty" yaml:"dmarc,omitempty"`
+		DKIM     string        `json:"dkim,omitempty" yaml:"dkim,omitempty"`
+		SPF      string        `json:"spf,omitempty" yaml:"spf,omitempty"`
+		Duration time.Duration `json:"duration,omitempty" yaml:"duration,omitempty"`
+		Err      error         `json:"-" yaml:"-"`
+		Error    string        `json:"error,omitempty" yaml:"error,omitempty"`
+		MX       []string      `json:"mx,omitempty" yaml:"mx,omitempty"`
+		TXT      []string      `json:"txt,omitempty" yaml:"txt,omitempty"`
+	}
+)
 
 // ConcurrentScans sets the number of domains that will be scanned
 // concurrently.
@@ -164,7 +169,7 @@ func New(options ...ScannerOption) (*Scanner, error) {
 // the nameservers specified in /etc/resolv.conf.
 func UseNameservers(ns []string) ScannerOption {
 	return func(s *Scanner) error {
-		// If the provided slice of nameservers is nil, or has a zero
+		// If the provided slice of nameservers is nil, or has zero
 		// elements, load up /etc/resolv.conf, and get the "nameserver"
 		// directives from there.
 		if ns == nil || len(ns) == 0 {
@@ -258,7 +263,7 @@ func (s *Scanner) Scan(name string) *ScanResult {
 			res.Err = errors.Wrap(err, "AAAA")
 		}
 	case "all":
-		if err = s.GetDNSRecords(res, "A", "AAAA", "CNAME", "DKIM", "DMARC", "MX", "SPF", "TXT"); err != nil {
+		if err = s.GetDNSRecords(res, "A", "AAAA", "BIMI", "CNAME", "DKIM", "DMARC", "MX", "SPF", "TXT"); err != nil {
 			res.Err = errors.Wrap(err, "All")
 		}
 	case "cname":
@@ -270,12 +275,12 @@ func (s *Scanner) Scan(name string) *ScanResult {
 			res.Err = errors.Wrap(err, "MX")
 		}
 	case "txt":
-		if res.MX, err = s.getTypeTXT(res.Domain); err != nil {
+		if res.TXT, err = s.getTypeTXT(res.Domain); err != nil {
 			res.Err = errors.Wrap(err, "TXT")
 		}
 	default:
 		// case "sec"
-		if err = s.GetDNSRecords(res, "DKIM", "DMARC", "MX", "SPF"); err != nil {
+		if err = s.GetDNSRecords(res, "BIMI", "DKIM", "DMARC", "MX", "SPF"); err != nil {
 			res.Err = errors.Wrap(err, "All")
 		}
 	}

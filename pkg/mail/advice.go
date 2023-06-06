@@ -1,16 +1,16 @@
 package mail
 
 import (
-	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/domainadvisor"
+	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/domain_advisor"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
 	"github.com/matcornic/hermes/v2"
 )
 
 // PrepareEmail
-func PrepareEmail(result *scanner.ScanResult) hermes.Email {
+func (s *Server) PrepareEmail(result *scanner.ScanResult) hermes.Email {
 	var mailServers string
 
-	entries := domainAdvice(result)
+	entries := s.domainAdvice(result)
 
 	email := hermes.Email{
 		Body: hermes.Body{
@@ -23,82 +23,77 @@ func PrepareEmail(result *scanner.ScanResult) hermes.Email {
 		},
 	}
 
-	if entries[0].Key != "DOMAIN" {
-		for _, server := range result.MX {
-			if mailServers == "" {
-				mailServers = server
-			} else {
-				mailServers = mailServers + "\n" + server
-			}
+	for _, server := range result.MX {
+		if mailServers == "" {
+			mailServers = server
+		} else {
+			mailServers = mailServers + "\n" + server
 		}
+	}
 
-		email.Body.Table = hermes.Table{
-			Data: [][]hermes.Entry{
-				{
-					{Key: "Test", Value: "DKIM"},
-					{Key: "Result", Value: result.DKIM},
-				},
-				{
-					{Key: "Test", Value: "DMARC"},
-					{Key: "Result", Value: result.DMARC},
-				},
-				{
-					{Key: "Test", Value: "MX"},
-					{Key: "Result", Value: mailServers},
-				},
-				{
-					{Key: "Test", Value: "SPF"},
-					{Key: "Result", Value: result.SPF},
-				},
+	email.Body.Table = hermes.Table{
+		Data: [][]hermes.Entry{
+			{
+				{Key: "Test", Value: "DOMAIN"},
+				{Key: "Result", Value: result.Domain},
 			},
-		}
+			{
+				{Key: "Test", Value: "BIMI"},
+				{Key: "Result", Value: result.BIMI},
+			},
+			{
+				{Key: "Test", Value: "DKIM"},
+				{Key: "Result", Value: result.DKIM},
+			},
+			{
+				{Key: "Test", Value: "DMARC"},
+				{Key: "Result", Value: result.DMARC},
+			},
+			{
+				{Key: "Test", Value: "MX"},
+				{Key: "Result", Value: mailServers},
+			},
+			{
+				{Key: "Test", Value: "SPF"},
+				{Key: "Result", Value: result.SPF},
+			},
+		},
 	}
 
 	return email
 }
 
-func domainAdvice(result *scanner.ScanResult) (entries []hermes.Entry) {
-	var val string
+func (s *Server) domainAdvice(result *scanner.ScanResult) (entries []hermes.Entry) {
+	advice := domainAdvisor.CheckAll(result.BIMI, result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF, s.CheckTls)
 
-	advice := domainadvisor.CheckAll(result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF)
+	entries = append(entries, hermes.Entry{
+		Key:   "Domain",
+		Value: stringify(advice["domain"]),
+	})
 
-	if val = stringify(advice["DOMAIN"]); val != "" {
-		return append(entries, hermes.Entry{
-			Key:   "DOMAIN",
-			Value: val,
-		})
-	}
+	entries = append(entries, hermes.Entry{
+		Key:   "BIMI",
+		Value: stringify(advice["bimi"]),
+	})
 
-	if val = stringify(advice["DKIM"]); val == "" {
-		val = "DKIM is setup for this email server. However, if you have other 3rd party systems, please send a test email to confirm DKIM is setup properly."
-	}
 	entries = append(entries, hermes.Entry{
 		Key:   "DKIM",
-		Value: val,
+		Value: stringify(advice["dkim"]),
 	})
 
-	if val = stringify(advice["DMARC"]); val == "" {
-		val = "You are at the highest level! Please make sure to continue reviewing the reports and make the appropriate adjustments, if needed."
-	}
 	entries = append(entries, hermes.Entry{
 		Key:   "DMARC",
-		Value: val,
+		Value: stringify(advice["dmarc"]),
 	})
 
-	if val = stringify(advice["MX"]); val == "" {
-		val = "You have a multiple mail servers setup! No further action needed."
-	}
 	entries = append(entries, hermes.Entry{
 		Key:   "MX",
-		Value: val,
+		Value: stringify(advice["mx"]),
 	})
 
-	if val = stringify(advice["SPF"]); val == "" {
-		val = "SPF seems to be setup correctly!"
-	}
 	entries = append(entries, hermes.Entry{
 		Key:   "SPF",
-		Value: val,
+		Value: stringify(advice["spf"]),
 	})
 
 	return entries

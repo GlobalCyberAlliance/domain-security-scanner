@@ -28,6 +28,8 @@ func (s *Scanner) GetDNSRecords(scanResult *ScanResult, recordTypes ...string) (
 			scanResult.A, err = s.getTypeA(scanResult.Domain)
 		case "AAAA":
 			scanResult.AAAA, err = s.getTypeAAAA(scanResult.Domain)
+		case "BIMI":
+			scanResult.BIMI, err = s.getTypeBIMI(scanResult.Domain)
 		case "CNAME":
 			scanResult.CNAME, err = s.getTypeCNAME(scanResult.Domain)
 		case "DKIM":
@@ -82,6 +84,26 @@ func (s *Scanner) getTypeAAAA(domain string) (records []string, err error) {
 	return records, nil
 }
 
+func (s *Scanner) getTypeBIMI(domain string) (string, error) {
+	for _, dname := range []string{
+		"default._bimi." + domain,
+		domain,
+	} {
+		txtRecords, err := s.getTypeTXT(dname)
+		if err != nil {
+			return "", nil
+		}
+
+		for _, txt := range txtRecords {
+			if strings.HasPrefix(txt, BIMIPrefix) {
+				return txt, nil
+			}
+		}
+	}
+
+	return "", nil
+}
+
 func (s *Scanner) getTypeCNAME(domain string) (string, error) {
 	answers, err := s.getDNSAnswers(domain, dns.TypeCNAME)
 	if err != nil {
@@ -104,6 +126,15 @@ func (s *Scanner) getTypeDKIM(name string) (string, error) {
 
 	for _, dname := range []string{
 		s.DKIMSelector + "._domainkey." + name,
+		"google._domainkey." + name,        // Google
+		"selector1._domainkey." + name,     // Microsoft
+		"selector2._domainkey." + name,     // Microsoft
+		"k1._domainkey." + name,            // MailChimp
+		"mandrill._domainkey." + name,      // Mandrill
+		"everlytickey1._domainkey." + name, // Everlytic
+		"everlytickey2._domainkey." + name, // Everlytic
+		"dkim._domainkey." + name,          // Hetzner
+		"mxvault._domainkey." + name,       // MxVault
 		name,
 	} {
 		txtRecords, err := s.getTypeTXT(dname)
@@ -117,6 +148,7 @@ func (s *Scanner) getTypeDKIM(name string) (string, error) {
 			}
 		}
 	}
+
 	return "", nil
 }
 

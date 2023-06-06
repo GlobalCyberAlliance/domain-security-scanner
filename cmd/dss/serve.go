@@ -19,7 +19,7 @@ func init() {
 	cmdServeMail.Flags().StringVar(&mailConfig.Inbound.Host, "inboundHost", "", "Incoming mail host and port")
 	cmdServeMail.Flags().StringVar(&mailConfig.Inbound.Pass, "inboundPass", "", "Incoming mail password")
 	cmdServeMail.Flags().StringVar(&mailConfig.Inbound.User, "inboundUser", "", "Incoming mail username")
-	cmdServeMail.Flags().DurationVar(&interval, "interval", 10, "Set the mail check interval in seconds")
+	cmdServeMail.Flags().DurationVar(&interval, "interval", 30, "Set the mail check interval in seconds")
 	cmdServeMail.Flags().StringVar(&mailConfig.Outbound.Host, "outboundHost", "", "Outgoing mail host and port")
 	cmdServeMail.Flags().StringVar(&mailConfig.Outbound.Pass, "outboundPass", "", "Outgoing mail password")
 	cmdServeMail.Flags().StringVar(&mailConfig.Outbound.User, "outboundUser", "", "Outgoing mail username")
@@ -60,6 +60,7 @@ var (
 				log.Fatal().Err(err).Msg("could not create domain scanner")
 			}
 
+			server.CheckTls = checkTls
 			server.Scanner = sc
 
 			server.Serve(port)
@@ -86,6 +87,8 @@ var (
 			if err != nil {
 				log.Fatal().Err(err).Msg("could not open mail server connection")
 			}
+
+			mailServer.CheckTls = checkTls
 
 			mailServer.Serve(interval)
 		},
