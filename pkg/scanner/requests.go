@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/miekg/dns"
@@ -219,6 +220,20 @@ func (s *Scanner) getTypeTXT(domain string) (records []string, err error) {
 	}
 
 	for _, answer := range answers {
+		// handle recursive lookups
+		if answer.Header().Rrtype == dns.TypeCNAME {
+			if t, ok := answer.(*dns.CNAME); ok {
+				recursiveLookupTxt, err := s.getTypeTXT(t.Target)
+				if err != nil {
+					return nil, fmt.Errorf("failed to recursively lookup txt record for %v: %w", t.Target, err)
+				}
+
+				records = append(records, recursiveLookupTxt...)
+
+				continue
+			}
+		}
+
 		answer.Header().Rrtype = dns.TypeTXT
 		if t, ok := answer.(*dns.TXT); ok {
 			for _, txt := range t.Txt {
