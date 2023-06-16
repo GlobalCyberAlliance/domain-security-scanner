@@ -5,6 +5,7 @@ import (
 
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
+	"net"
 )
 
 func (s *Scanner) getDNSAnswers(domain string, recordType uint16) ([]dns.RR, error) {
@@ -41,7 +42,7 @@ func (s *Scanner) GetDNSRecords(scanResult *ScanResult, recordTypes ...string) (
 		case "SPF":
 			scanResult.SPF, err = s.getTypeSPF(scanResult.Domain)
 		case "TXT":
-			scanResult.TXT, err = s.getTypeTXT(scanResult.Domain)
+			scanResult.TXT, err = net.LookupTXT(scanResult.Domain)
 		default:
 			return errors.New("invalid dns record type")
 		}
@@ -89,7 +90,7 @@ func (s *Scanner) getTypeBIMI(domain string) (string, error) {
 		"default._bimi." + domain,
 		domain,
 	} {
-		txtRecords, err := s.getTypeTXT(dname)
+		txtRecords, err := net.LookupTXT(dname)
 		if err != nil {
 			return "", nil
 		}
@@ -137,10 +138,7 @@ func (s *Scanner) getTypeDKIM(name string) (string, error) {
 		"mxvault._domainkey." + name,       // MxVault
 		name,
 	} {
-		txtRecords, err := s.getTypeTXT(dname)
-		if err != nil {
-			return "", nil
-		}
+		txtRecords, _ := net.LookupTXT(dname)
 
 		for _, txt := range txtRecords {
 			if strings.HasPrefix(txt, DKIMPrefix) {
@@ -157,7 +155,7 @@ func (s *Scanner) getTypeDMARC(domain string) (string, error) {
 		"_dmarc." + domain,
 		domain,
 	} {
-		txtRecords, err := s.getTypeTXT(dname)
+		txtRecords, err := net.LookupTXT(dname)
 		if err != nil {
 			return "", nil
 		}
@@ -188,7 +186,7 @@ func (s *Scanner) getTypeMX(domain string) (records []string, err error) {
 }
 
 func (s *Scanner) getTypeSPF(domain string) (string, error) {
-	txtRecords, err := s.getTypeTXT(domain)
+	txtRecords, err := net.LookupTXT(domain)
 	if err != nil {
 		return "", err
 	}
