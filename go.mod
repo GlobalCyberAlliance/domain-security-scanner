@@ -8,7 +8,7 @@ require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-mail/mail/v2 v2.3.0
 	github.com/matcornic/hermes/v2 v2.1.0
-	github.com/miekg/dns v1.1.54
+	github.com/miekg/dns v1.1.55
 	github.com/pkg/errors v0.9.1
 	github.com/rs/cors v1.9.0
 	github.com/rs/zerolog v1.29.1

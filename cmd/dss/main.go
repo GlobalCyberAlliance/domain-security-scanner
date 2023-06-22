@@ -19,7 +19,7 @@ var (
 		Use:     "dss",
 		Short:   "Scan a domain's DNS records.",
 		Long:    "Scan a domain's DNS records.\nhttps://github.com/GlobalCyberAlliance/DomainSecurityScanner",
-		Version: "2.2.2",
+		Version: "2.2.3",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			getConfig()
 			if len(nameservers) == 0 {
@@ -58,7 +58,7 @@ func getConfig() {
 		log.Fatal().Err(err).Msg("unable to retrieve user's home directory")
 	}
 
-	configDir = configDir + "/.config/domain-security-scanner"
+	configDir = strings.TrimSuffix(configDir, "/") + "/.config/domain-security-scanner"
 
 	viper.AddConfigPath(configDir)
 	viper.SetConfigName("config")
@@ -66,7 +66,9 @@ func getConfig() {
 	viper.SetDefault("nameservers", "8.8.8.8")
 
 	if err = viper.ReadInConfig(); err != nil {
-		_ = os.Mkdir(configDir, os.ModePerm)
+		if err = os.MkdirAll(configDir, os.ModePerm); err != nil {
+			log.Fatal().Err(err).Msg("failed to create config directory")
+		}
 
 		if _, err = os.Create(configDir + "/config.yml"); err != nil {
 			log.Fatal().Err(err).Msg("unable to create config")
