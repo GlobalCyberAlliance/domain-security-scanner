@@ -7,7 +7,6 @@ import (
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/cast"
 )
 
@@ -53,11 +52,11 @@ func (s *Server) handler() error {
 	for {
 		select {
 		case <-ticker.C:
-			log.Debug().Msg("Checking for mail")
+			s.logger.Debug().Msg("Checking for mail")
 
 			addresses, err := s.GetMail()
 			if err != nil && err.Error() != "no new messages" {
-				log.Error().Err(err).Msg("could not obtain the latest mail from mail server")
+				s.logger.Error().Err(err).Msg("could not obtain the latest mail from mail server")
 			}
 
 			var domainList []string
@@ -76,11 +75,11 @@ func (s *Server) handler() error {
 				}
 
 				if err = s.SendMail(sender, s.PrepareEmail(result)); err != nil {
-					log.Error().Err(err).Msg("An error occurred while sending scan results to " + sender)
+					s.logger.Error().Err(err).Msg("An error occurred while sending scan results to " + sender)
 					continue
 				}
 
-				log.Info().Msg("Sent results to " + sender)
+				s.logger.Info().Msg("Sent results to " + sender)
 			}
 		case <-quit:
 			ticker.Stop()

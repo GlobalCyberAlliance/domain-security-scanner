@@ -19,21 +19,27 @@ var (
 		Use:     "dss",
 		Short:   "Scan a domain's DNS records.",
 		Long:    "Scan a domain's DNS records.\nhttps://github.com/GlobalCyberAlliance/DomainSecurityScanner",
-		Version: "2.2.3",
+		Version: "2.2.4",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if debug {
+				log = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).With().Timestamp().Logger().Level(zerolog.DebugLevel)
+			} else {
+				log = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).With().Timestamp().Logger().Level(zerolog.InfoLevel)
+			}
+
 			getConfig()
 			if len(nameservers) == 0 {
 				nameservers = cfg.Nameservers
 			}
 		},
 	}
-	cfg                                            *Config
-	log                                            = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).With().Timestamp().Logger().Level(zerolog.InfoLevel)
-	concurrent                                     int
-	dkimSelector, format, recordType               string
-	nameservers                                    []string
-	timeout                                        int64
-	advise, cache, checkTls, writeToFile, zoneFile bool
+	cfg                                                   *Config
+	log                                                   zerolog.Logger
+	concurrent                                            int
+	dkimSelector, format, recordType                      string
+	nameservers                                           []string
+	timeout                                               int64
+	advise, debug, cache, checkTls, writeToFile, zoneFile bool
 )
 
 func main() {
@@ -41,10 +47,11 @@ func main() {
 	cmd.PersistentFlags().BoolVar(&cache, "cache", false, "Cache scan results for 60 seconds")
 	cmd.PersistentFlags().BoolVar(&checkTls, "checkTls", false, "Check the TLS connectivity and cert validity of domains")
 	cmd.PersistentFlags().IntVarP(&concurrent, "concurrent", "c", runtime.NumCPU(), "The number of domains to scan concurrently")
-	cmd.PersistentFlags().StringVarP(&dkimSelector, "dkimSelector", "d", "x", "Specify a DKIM selector")
+	cmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Print debug logs")
+	cmd.PersistentFlags().StringVar(&dkimSelector, "dkimSelector", "x", "Specify a DKIM selector")
 	cmd.PersistentFlags().StringVarP(&format, "format", "f", "yaml", "Format to print results in (yaml, json)")
 	cmd.PersistentFlags().StringSliceVarP(&nameservers, "nameservers", "n", nil, "Use specific nameservers, in `host[:port]` format; may be specified multiple times")
-	cmd.PersistentFlags().StringVarP(&recordType, "type", "r", "sec", "Type of DNS record to lookup (a, aaaa, cname, mx, sec [DKIM/DMARC/SPF], txt")
+	cmd.PersistentFlags().StringVar(&recordType, "type", "sec", "Type of DNS record to lookup (a, aaaa, cname, mx, sec [DKIM/DMARC/SPF], txt")
 	cmd.PersistentFlags().Int64VarP(&timeout, "timeout", "t", 15, "Timeout duration for a DNS query")
 	cmd.PersistentFlags().BoolVarP(&writeToFile, "writetofile", "w", false, "Write the output to a file")
 	cmd.PersistentFlags().BoolVarP(&zoneFile, "zonefile", "z", false, "Input file/pipe containing an RFC 1035 zone file")
