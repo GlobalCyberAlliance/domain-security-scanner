@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"runtime"
 	"strings"
@@ -19,7 +20,7 @@ var (
 		Use:     "dss",
 		Short:   "Scan a domain's DNS records.",
 		Long:    "Scan a domain's DNS records.\nhttps://github.com/GlobalCyberAlliance/DomainSecurityScanner",
-		Version: "2.3.0",
+		Version: "2.3.1",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if debug {
 				log = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).With().Timestamp().Logger().Level(zerolog.DebugLevel)
@@ -134,9 +135,7 @@ func printToConsole(data interface{}) {
 		return
 	}
 
-	marshalledData := marshal(data)
-
-	print(string(marshalledData))
+	fmt.Println(string(marshal(data)))
 }
 
 func printToFile(data interface{}, file string) {
