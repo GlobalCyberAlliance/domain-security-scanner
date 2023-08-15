@@ -16,9 +16,7 @@ import (
 	"github.com/spf13/cast"
 )
 
-// Server represents an HTTP server. It is meant to wrap all HTTP functionality
-// used by the application so that dependent packages (such as cmd/wtfd) do not
-// need to reference the "net/http" package at all.
+// Server represents the HTTP server
 type Server struct {
 	handler http.Handler
 	lmt     *limiter.Limiter
@@ -52,6 +50,10 @@ func NewServer(logger zerolog.Logger) *Server {
 	}
 
 	s.router.Use(gin.Logger(), gin.Recovery())
+
+	if err := s.router.SetTrustedProxies([]string{"10.0.0.0/24"}); err != nil {
+		logger.Fatal().Err(err).Msg("failed to set trusted proxies")
+	}
 
 	// Setup error handling routes.
 	s.router.NoRoute(func(c *gin.Context) {

@@ -45,11 +45,11 @@ Or you can provide [RFC 1035](https://tools.ietf.org/html/rfc1035) zone files by
 
 `dss scan -z < /path/to/zonefile`
 
-See the zonefile.example file in this repo.
+See the [zonefile.example](zonefile.example) file in this repo.
 
 ## Serve REST API
 
-You can also expose the domain scanning functionality via a REST API. By default, this is rate limited to 10 requests per second from a single IP address. Serve the API by runing the following:
+You can also expose the domain scanning functionality via a REST API. By default, this is rate limited to 10 requests per second from a single IP address. Serve the API by running the following:
 
 `dss serve api --port 80`
 
@@ -96,7 +96,7 @@ You can then get a single domain's results by submitting a GET request like this
 }
 ```
 
-Alternatively, you can scan multiple domains by POSTing them to http://server-ip:port/api/v1/scan with a request body like this:
+Alternatively, you can scan multiple domains by POSTing them to `http://server-ip:port/api/v1/scan` with a request body like this:
 
 ```json
 {
@@ -195,26 +195,21 @@ dss serve mail --inboundHost "imap.gmail.com:993" --inboundPass "SomePassword" -
 
 You can then email this inbox from any address, and you'll receive an email back with your scan results.
 
-### Flags
-`-a` `--advise` Enables advice for all records
-
-`--cache` Enables DNS cache (60 seconds)
-
-`--checkTls` Enables TLS checks for the root domain, as well as all mail servers
-
-`-c` `--concurrent` The number of domains to scan concurrently (default 12)
-
-`-d` `--dkimSelector` Specify a DKIM selector (default "x").
-
-`-f` `--format` Format to print results in (json, jsonp, yaml) (default "yaml").
-
-`-n` `--nameservers` Use specific nameservers, in host[:port] format; may be specified multiple times.
-
-`-t` `--timeout` Timeout duration for a DNS query (default 15).
-
-`-r` `--type` Type of DNS record to lookup (A, AAAA, CNAME, MX, SEC [DKIM/DMARC/SPF], TXT (default "SEC").
-
-`-z` `--zonefile` Input file/pipe containing an [RFC 1035](https://tools.ietf.org/html/rfc1035) zone file.
+### Global Flags
+| Flag             | Short | Description                                                                                                     |
+|------------------|-------|-----------------------------------------------------------------------------------------------------------------|
+| `--advise`       | `-a`  | Provide suggestions for incorrect/missing mail security features                                                |
+| `--cache`        |       | Cache scan results for 60 seconds                                                                               |
+| `--checkTls`     |       | Check the TLS connectivity and cert validity of domains                                                         |
+| `--concurrent`   | `-c`  | The number of domains to scan concurrently (default 10)                                                         |
+| `--debug`        | `-d`  | Print debug logs                                                                                                |
+| `--dkimSelector` |       | Specify a DKIM selector (default "x")                                                                           |
+| `--format`       | `-f`  | Format to print results in (yaml, json) (default "yaml")                                                        |
+| `--nameservers`  | `-n`  | Use specific nameservers, in host[:port] format; may be specified multiple times                                |
+| `--outputFile`   | `-o`  | Output the results to a specified file (creates a file with the current unix timestamp if no file is specified) |
+| `--timeout`      | `-t`  | Timeout duration for a DNS query (default 15)                                                                   |
+| `--type`         | `-r`  | Type of DNS record to lookup (a, aaaa, cname, mx, sec [DKIM/DMARC/SPF], txt (default "sec")                     |
+| `--zoneFile`     | `-z`  | Input file/pipe containing an RFC 1035 zone file                                                                |
 
 ## License
 
