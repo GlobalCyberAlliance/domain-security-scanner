@@ -204,7 +204,7 @@ You can then email this inbox from any address, and you'll receive an email back
 | `--concurrent`   | `-c`  | The number of domains to scan concurrently (default 10)                                                         |
 | `--debug`        | `-d`  | Print debug logs                                                                                                |
 | `--dkimSelector` |       | Specify a DKIM selector (default "x")                                                                           |
-| `--format`       | `-f`  | Format to print results in (yaml, json) (default "yaml")                                                        |
+| `--format`       | `-f`  | Format to print results in (yaml, json, csv) (default "yaml")                                                   |
 | `--nameservers`  | `-n`  | Use specific nameservers, in host[:port] format; may be specified multiple times                                |
 | `--outputFile`   | `-o`  | Output the results to a specified file (creates a file with the current unix timestamp if no file is specified) |
 | `--timeout`      | `-t`  | Timeout duration for a DNS query (default 15)                                                                   |
