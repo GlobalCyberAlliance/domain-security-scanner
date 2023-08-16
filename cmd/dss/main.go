@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/model"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
@@ -20,7 +23,7 @@ var (
 		Use:     "dss",
 		Short:   "Scan a domain's DNS records.",
 		Long:    "Scan a domain's DNS records.\nhttps://github.com/GlobalCyberAlliance/DomainSecurityScanner",
-		Version: "2.3.1",
+		Version: "2.3.2",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if debug {
 				log = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).With().Timestamp().Logger().Level(zerolog.DebugLevel)
@@ -106,6 +109,20 @@ func getConfig() {
 
 func marshal(data interface{}) (output []byte) {
 	switch strings.ToLower(format) {
+	case "csv":
+		// convert data to model.ScanResultWithAdvice
+		scan, ok := data.(model.ScanResultWithAdvice)
+		if !ok {
+			log.Error().Msg("invalid data type")
+			return nil
+		}
+
+		// write to csv in buffer
+		var buffer bytes.Buffer
+		writer := csv.NewWriter(&buffer)
+		writer.Write(scan.Csv())
+		writer.Flush()
+		output = buffer.Bytes()
 	case "json":
 		output, _ = json.Marshal(data)
 	case "jsonp":

@@ -69,10 +69,9 @@ func (s *Server) handleScanDomains(c *gin.Context) {
 	var resultsWithAdvice []model.ScanResultWithAdvice
 
 	for result := range s.Scanner.Start(source) {
-		advice := domainAdvisor.CheckAll(result.BIMI, result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF, s.CheckTls)
 		resultsWithAdvice = append(resultsWithAdvice, model.ScanResultWithAdvice{
 			ScanResult: result,
-			Advice:     advice,
+			Advice:     domainAdvisor.CheckAll(result.BIMI, result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF, s.CheckTls),
 		})
 	}
 

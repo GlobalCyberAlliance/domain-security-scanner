@@ -50,16 +50,20 @@ var cmdScan = &cobra.Command{
 		sc.DKIMSelector = dkimSelector
 		sc.RecordType = recordType
 
+		if format == "csv" && outputFile == "" {
+			log.Info().Msg("CSV header: domain,A,AAAA,BIMI,CNAME,DKIM,DMARC,MX,SPF,TXT,duration,error,advice")
+		}
+
 		for result := range sc.Start(source) {
-			if advise {
-				advice := domainAdvisor.CheckAll(result.BIMI, result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF, checkTls)
-				printToConsole(model.ScanResultWithAdvice{
-					ScanResult: result,
-					Advice:     advice,
-				})
-			} else {
-				printToConsole(result)
+			resultWithAdvice := model.ScanResultWithAdvice{
+				ScanResult: result,
 			}
+
+			if advise {
+				resultWithAdvice.Advice = domainAdvisor.CheckAll(result.BIMI, result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF, checkTls)
+			}
+
+			printToConsole(resultWithAdvice)
 		}
 	},
 }
