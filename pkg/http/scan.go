@@ -23,7 +23,7 @@ func (s *Server) handleScanDomains(c *gin.Context) {
 
 	switch c.Request.Method {
 	case "GET":
-		domains.Domains[0] = c.Param("domain")
+		domains.Domains = []string{c.Param("domain")}
 		break
 	case "POST":
 		if err := Decode(c, &domains); err != nil {
@@ -65,5 +65,15 @@ func (s *Server) handleScanDomains(c *gin.Context) {
 		})
 	}
 
-	s.respond(c, 200, resultsWithAdvice)
+	if len(resultsWithAdvice) == 0 {
+		s.respond(c, 404, "no results found")
+		return
+	}
+
+	switch c.Request.Method {
+	case "GET":
+		s.respond(c, 200, resultsWithAdvice[0])
+	case "POST":
+		s.respond(c, 200, resultsWithAdvice)
+	}
 }

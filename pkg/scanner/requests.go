@@ -199,8 +199,6 @@ func (s *Scanner) getTypeSPF(domain string) (string, error) {
 		return "", err
 	}
 
-	fmt.Println(txtRecords)
-
 	for _, txt := range txtRecords {
 		if strings.HasPrefix(txt, SPFPrefix) {
 			if !strings.Contains(txt, "redirect=") {
