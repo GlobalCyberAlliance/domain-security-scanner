@@ -14,37 +14,31 @@ type bulkDomainRequest struct {
 }
 
 func (s *Server) registerScanRoutes(r *gin.RouterGroup) {
-	r.GET("/scan/:domain", s.handleScanDomain)
+	r.GET("/scan/:domain", s.handleScanDomains)
 	r.POST("/scan", s.handleScanDomains)
-}
-
-func (s *Server) handleScanDomain(c *gin.Context) {
-	domain := c.Param("domain")
-
-	if queryParam, ok := c.GetQuery("dkimSelector"); ok {
-		s.Scanner.DKIMSelector = queryParam
-	}
-
-	if queryParam, ok := c.GetQuery("recordType"); ok {
-		s.Scanner.RecordType = queryParam
-	}
-
-	result := s.Scanner.Scan(domain)
-	advice := domainAdvisor.CheckAll(result.BIMI, result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF, s.CheckTls)
-
-	resultWithAdvice := model.ScanResultWithAdvice{
-		ScanResult: result,
-		Advice:     advice,
-	}
-
-	s.respond(c, 200, &resultWithAdvice)
 }
 
 func (s *Server) handleScanDomains(c *gin.Context) {
 	var domains bulkDomainRequest
 
-	if err := Decode(c, &domains); err != nil {
-		s.logger.Error().Err(err).Msg("error occurred during handleScanDomains request")
+	switch c.Request.Method {
+	case "GET":
+		domains.Domains[0] = c.Param("domain")
+		break
+	case "POST":
+		if err := Decode(c, &domains); err != nil {
+			s.logger.Error().Err(err).Msg("error occurred during handleScanDomains request")
+			s.respond(c, 400, "you need to supply an array of domains in the body of the request, formatted as json")
+			return
+		}
+		break
+	default:
+		s.respond(c, 405, "method not allowed")
+		return
+	}
+
+	// check for empty array
+	if len(domains.Domains) == 0 {
 		s.respond(c, 400, "you need to supply an array of domains in the body of the request, formatted as json")
 		return
 	}
@@ -60,10 +54,6 @@ func (s *Server) handleScanDomains(c *gin.Context) {
 
 	if queryParam, ok := c.GetQuery("dkimSelector"); ok {
 		s.Scanner.DKIMSelector = queryParam
-	}
-
-	if queryParam, ok := c.GetQuery("recordType"); ok {
-		s.Scanner.RecordType = queryParam
 	}
 
 	var resultsWithAdvice []model.ScanResultWithAdvice

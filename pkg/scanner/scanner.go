@@ -63,10 +63,6 @@ type (
 		// issue queries against.
 		Nameservers []string
 
-		// RecordType determines which queries are run against a provided
-		// domain.
-		RecordType string
-
 		// cacheEnabled specifies whether the scanner should utilize the in-memory
 		// cache or not.
 		cacheEnabled bool
@@ -76,6 +72,10 @@ type (
 
 		// DNS client shared by all goroutines the scanner spawns.
 		dc *dns.Client
+
+		// dnsBuffer is used to configure the size of the buffer allocated for
+		// DNS responses
+		dnsBuffer uint16
 
 		// The index of the last-used nameserver, from the Nameservers slice.
 		//
@@ -109,6 +109,30 @@ type (
 	}
 )
 
+// New initializes and returns a new *Scanner.
+func New(options ...ScannerOption) (*Scanner, error) {
+	s := &Scanner{
+		dc:        new(dns.Client),
+		dnsBuffer: 1024,
+	}
+
+	for _, option := range options {
+		if err := option(s); err != nil {
+			return nil, errors.Wrap(err, "apply option")
+		}
+	}
+
+	if s.sem == nil {
+		s.sem = make(chan struct{}, runtime.NumCPU())
+	}
+
+	for i := 0; i < cap(s.sem); i++ {
+		s.sem <- struct{}{}
+	}
+
+	return s, nil
+}
+
 // ConcurrentScans sets the number of domains that will be scanned
 // concurrently.
 //
@@ -138,30 +162,6 @@ func UseCache(enable bool) ScannerOption {
 		}
 		return nil
 	}
-}
-
-// New initializes and returns a new *Scanner.
-func New(options ...ScannerOption) (*Scanner, error) {
-	s := &Scanner{
-		dc: new(dns.Client),
-	}
-
-	for _, option := range options {
-		if err := option(s); err != nil {
-			return nil, errors.Wrap(err, "apply option")
-		}
-	}
-
-	if s.sem == nil {
-		s.sem = make(chan struct{}, runtime.NumCPU())
-	}
-	for i := 0; i < cap(s.sem); i++ {
-		s.sem <- struct{}{}
-	}
-
-	s.dc.SingleInflight = true
-
-	return s, nil
 }
 
 // UseNameservers allows the caller to provide a custom set of nameservers for
@@ -198,6 +198,14 @@ func UseNameservers(ns []string) ScannerOption {
 			}
 		}
 		s.Nameservers = ns[:]
+		return nil
+	}
+}
+
+// WithDnsBuffer increases the allocated buffer for DNS responses
+func WithDnsBuffer(bufferSize uint16) ScannerOption {
+	return func(s *Scanner) error {
+		s.dnsBuffer = bufferSize
 		return nil
 	}
 }
@@ -253,36 +261,8 @@ func (s *Scanner) Scan(name string) *ScanResult {
 	res := &ScanResult{Domain: name}
 	start := time.Now()
 
-	switch s.RecordType {
-	case "a":
-		if res.A, err = s.getTypeA(res.Domain); err != nil {
-			res.Err = errors.Wrap(err, "A")
-		}
-	case "aaaa":
-		if res.A, err = s.getTypeAAAA(res.Domain); err != nil {
-			res.Err = errors.Wrap(err, "AAAA")
-		}
-	case "all":
-		if err = s.GetDNSRecords(res, "A", "AAAA", "BIMI", "CNAME", "DKIM", "DMARC", "MX", "SPF", "TXT"); err != nil {
-			res.Err = errors.Wrap(err, "All")
-		}
-	case "cname":
-		if res.CNAME, err = s.getTypeCNAME(res.Domain); err != nil {
-			res.Err = errors.Wrap(err, "CNAME")
-		}
-	case "mx":
-		if res.MX, err = s.getTypeMX(res.Domain); err != nil {
-			res.Err = errors.Wrap(err, "MX")
-		}
-	case "txt":
-		if res.TXT, err = s.getTypeTXT(res.Domain); err != nil {
-			res.Err = errors.Wrap(err, "TXT")
-		}
-	default:
-		// case "sec"
-		if err = s.GetDNSRecords(res, "BIMI", "DKIM", "DMARC", "MX", "SPF"); err != nil {
-			res.Err = errors.Wrap(err, "All")
-		}
+	if err = s.GetDNSRecords(res, "BIMI", "DKIM", "DMARC", "MX", "SPF"); err != nil {
+		res.Err = errors.Wrap(err, "All")
 	}
 
 	res.Duration = time.Since(start)

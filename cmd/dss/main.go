@@ -23,7 +23,7 @@ var (
 		Use:     "dss",
 		Short:   "Scan a domain's DNS records.",
 		Long:    "Scan a domain's DNS records.\nhttps://github.com/GlobalCyberAlliance/DomainSecurityScanner",
-		Version: "2.3.2",
+		Version: "2.3.3",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if debug {
 				log = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).With().Timestamp().Logger().Level(zerolog.DebugLevel)
@@ -43,13 +43,14 @@ var (
 			}
 		},
 	}
-	cfg                                          *Config
-	log                                          zerolog.Logger
-	concurrent, writeToFileCounter               int
-	dkimSelector, format, outputFile, recordType string
-	nameservers                                  []string
-	timeout                                      int64
-	advise, debug, cache, checkTls, zoneFile     bool
+	cfg                                      *Config
+	log                                      zerolog.Logger
+	concurrent, writeToFileCounter           int
+	dkimSelector, format, outputFile         string
+	nameservers                              []string
+	timeout                                  int64
+	advise, debug, cache, checkTls, zoneFile bool
+	dnsBuffer                                uint16
 )
 
 func main() {
@@ -59,10 +60,10 @@ func main() {
 	cmd.PersistentFlags().IntVarP(&concurrent, "concurrent", "c", runtime.NumCPU(), "The number of domains to scan concurrently")
 	cmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Print debug logs")
 	cmd.PersistentFlags().StringVar(&dkimSelector, "dkimSelector", "x", "Specify a DKIM selector")
+	cmd.PersistentFlags().Uint16Var(&dnsBuffer, "dnsBuffer", 1024, "Specify the allocated buffer for DNS responses")
 	cmd.PersistentFlags().StringVarP(&format, "format", "f", "yaml", "Format to print results in (yaml, json)")
 	cmd.PersistentFlags().StringSliceVarP(&nameservers, "nameservers", "n", nil, "Use specific nameservers, in `host[:port]` format; may be specified multiple times")
 	cmd.PersistentFlags().StringVarP(&outputFile, "outputFile", "o", "", "Output the results to a specified file (creates a file with the current unix timestamp if no file is specified)")
-	cmd.PersistentFlags().StringVar(&recordType, "type", "sec", "Type of DNS record to lookup (a, aaaa, cname, mx, sec [DKIM/DMARC/SPF], txt")
 	cmd.PersistentFlags().Int64VarP(&timeout, "timeout", "t", 15, "Timeout duration for a DNS query")
 	cmd.PersistentFlags().BoolVarP(&zoneFile, "zoneFile", "z", false, "Input file/pipe containing an RFC 1035 zone file")
 
@@ -120,7 +121,7 @@ func marshal(data interface{}) (output []byte) {
 		// write to csv in buffer
 		var buffer bytes.Buffer
 		writer := csv.NewWriter(&buffer)
-		writer.Write(scan.Csv())
+		_ = writer.Write(scan.Csv())
 		writer.Flush()
 		output = buffer.Bytes()
 	case "json":

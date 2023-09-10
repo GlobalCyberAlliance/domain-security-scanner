@@ -25,6 +25,7 @@ var cmdScan = &cobra.Command{
 			scanner.ConcurrentScans(concurrent),
 			scanner.UseCache(cache),
 			scanner.UseNameservers(nameservers),
+			scanner.WithDnsBuffer(dnsBuffer),
 			scanner.WithTimeout(time.Duration(timeout) * time.Second),
 		}
 
@@ -48,7 +49,6 @@ var cmdScan = &cobra.Command{
 		}
 
 		sc.DKIMSelector = dkimSelector
-		sc.RecordType = recordType
 
 		if format == "csv" && outputFile == "" {
 			log.Info().Msg("CSV header: domain,A,AAAA,BIMI,CNAME,DKIM,DMARC,MX,SPF,TXT,duration,error,advice")

@@ -11,6 +11,7 @@ import (
 func (s *Scanner) getDNSAnswers(domain string, recordType uint16) ([]dns.RR, error) {
 	req := new(dns.Msg)
 	req.SetQuestion(dns.Fqdn(domain), recordType)
+	req.SetEdns0(s.dnsBuffer, true) // increases the response buffer size
 
 	in, _, err := s.dc.Exchange(req, s.GetNS())
 	if err != nil {
@@ -76,8 +77,8 @@ func (s *Scanner) getTypeAAAA(domain string) (records []string, err error) {
 		return nil, err
 	}
 
-	for _, ans := range answers {
-		if t, ok := ans.(*dns.AAAA); ok {
+	for _, answer := range answers {
+		if t, ok := answer.(*dns.AAAA); ok {
 			records = append(records, t.AAAA.String())
 		}
 	}
@@ -95,9 +96,10 @@ func (s *Scanner) getTypeBIMI(domain string) (string, error) {
 			return "", nil
 		}
 
-		for _, txt := range txtRecords {
+		for index, txt := range txtRecords {
 			if strings.HasPrefix(txt, BIMIPrefix) {
-				return txt, nil
+				// TXT records can be split across multiple strings, so we need to join them
+				return strings.Join(txtRecords[index:], ""), nil
 			}
 		}
 	}
@@ -127,6 +129,7 @@ func (s *Scanner) getTypeDKIM(name string) (string, error) {
 
 	for _, dname := range []string{
 		s.DKIMSelector + "._domainkey." + name,
+		"email._domainkey." + name,         // Generic
 		"google._domainkey." + name,        // Google
 		"selector1._domainkey." + name,     // Microsoft
 		"selector2._domainkey." + name,     // Microsoft
@@ -143,9 +146,10 @@ func (s *Scanner) getTypeDKIM(name string) (string, error) {
 			return "", nil
 		}
 
-		for _, txt := range txtRecords {
+		for index, txt := range txtRecords {
 			if strings.HasPrefix(txt, DKIMPrefix) {
-				return txt, nil
+				// TXT records can be split across multiple strings, so we need to join them
+				return strings.Join(txtRecords[index:], ""), nil
 			}
 		}
 	}
@@ -163,9 +167,10 @@ func (s *Scanner) getTypeDMARC(domain string) (string, error) {
 			return "", nil
 		}
 
-		for _, txt := range txtRecords {
+		for index, txt := range txtRecords {
 			if strings.HasPrefix(txt, DMARCPrefix) {
-				return txt, nil
+				// TXT records can be split across multiple strings, so we need to join them
+				return strings.Join(txtRecords[index:], ""), nil
 			}
 		}
 	}
@@ -193,6 +198,8 @@ func (s *Scanner) getTypeSPF(domain string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	fmt.Println(txtRecords)
 
 	for _, txt := range txtRecords {
 		if strings.HasPrefix(txt, SPFPrefix) {

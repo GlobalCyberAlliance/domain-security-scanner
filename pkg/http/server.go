@@ -29,11 +29,11 @@ type Server struct {
 	CheckTls bool
 	Routes   *gin.RouterGroup
 
-	// Services used by the various HTTP routes.
+	// Services used by the various HTTP routes
 	Scanner *scanner.Scanner
 }
 
-// NewServer returns a new instance of Server.
+// NewServer returns a new instance of Server
 func NewServer(logger zerolog.Logger) *Server {
 	gin.SetMode(gin.ReleaseMode)
 
@@ -41,7 +41,7 @@ func NewServer(logger zerolog.Logger) *Server {
 	rateLimiter.SetIPLookups([]string{"RemoteAddr", "X-Forwarded-For", "X-Real-IP"}).
 		SetMethods([]string{"GET", "POST"})
 
-	// Create a new server that wraps the net/http server & add a gin router.
+	// Create a new server that wraps the net/http server & add a gin router
 	s := &Server{
 		logger: logger,
 		lmt:    rateLimiter,
@@ -55,7 +55,7 @@ func NewServer(logger zerolog.Logger) *Server {
 		logger.Fatal().Err(err).Msg("failed to set trusted proxies")
 	}
 
-	// Setup error handling routes.
+	// Setup error handling routes
 	s.router.NoRoute(func(c *gin.Context) {
 		c.JSON(404, gin.H{"message": "not found"})
 	})
@@ -63,7 +63,7 @@ func NewServer(logger zerolog.Logger) *Server {
 	v1 := s.router.Group("/api/v1")
 	v1.Use(s.handleRateLimit(s.lmt))
 
-	// Register unauthenticated routes.
+	// Register unauthenticated routes
 	{
 		s.Routes = v1.Group("")
 		s.registerScanRoutes(s.Routes)
@@ -113,8 +113,7 @@ func (s *Server) handleRateLimit(lmt *limiter.Limiter) gin.HandlerFunc {
 
 func (s *Server) respond(c *gin.Context, code int, data interface{}) {
 	if code/100 == 4 || code/100 == 5 {
-		text := fmt.Sprintf("%v", data)
-		data = map[string]string{"message": text}
+		data = map[string]string{"message": fmt.Sprintf("%v", data)}
 	}
 
 	c.Writer.Header().Set("Content-Type", "application/json")
