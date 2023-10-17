@@ -205,6 +205,10 @@ func UseNameservers(ns []string) ScannerOption {
 // WithDnsBuffer increases the allocated buffer for DNS responses
 func WithDnsBuffer(bufferSize uint16) ScannerOption {
 	return func(s *Scanner) error {
+		if bufferSize > 4096 {
+			return errors.New("buffer size should not be larger than 4096")
+		}
+
 		s.dnsBuffer = bufferSize
 		return nil
 	}
