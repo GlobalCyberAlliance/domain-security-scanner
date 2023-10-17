@@ -53,7 +53,7 @@ func (s *Server) handleScanDomains(c *gin.Context) {
 	source := scanner.TextSource(domainList)
 
 	if queryParam, ok := c.GetQuery("dkimSelector"); ok {
-		s.Scanner.DKIMSelector = queryParam
+		s.Scanner.DKIMSelectors = strings.Split(queryParam, ",")
 	}
 
 	var resultsWithAdvice []model.ScanResultWithAdvice

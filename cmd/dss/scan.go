@@ -48,7 +48,7 @@ var cmdScan = &cobra.Command{
 			log.Fatal().Err(err).Msg("An unexpected error occurred.")
 		}
 
-		sc.DKIMSelector = dkimSelector
+		sc.DKIMSelectors = dkimSelector
 
 		if format == "csv" && outputFile == "" {
 			log.Info().Msg("CSV header: domain,A,AAAA,BIMI,CNAME,DKIM,DMARC,MX,SPF,TXT,duration,error,advice")

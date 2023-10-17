@@ -55,9 +55,9 @@ type (
 		// the scanner.
 		Cache map[string]cachedResult
 
-		// DKIMSelector is used to specify where a DKIM record is hosted for
+		// DKIMSelectors is used to specify where a DKIM record is hosted for
 		// a specific domain.
-		DKIMSelector string
+		DKIMSelectors []string
 
 		// Nameservers is a slice of "host:port" strings of nameservers to
 		// issue queries against.

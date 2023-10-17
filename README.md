@@ -203,7 +203,7 @@ You can then email this inbox from any address, and you'll receive an email back
 | `--checkTls`     |       | Check the TLS connectivity and cert validity of domains                                                         |
 | `--concurrent`   | `-c`  | The number of domains to scan concurrently (default 10)                                                         |
 | `--debug`        | `-d`  | Print debug logs                                                                                                |
-| `--dkimSelector` |       | Specify a DKIM selector (default "x")                                                                           |
+| `--dkimSelector` |       | Specify a comma seperated list of DKIM selectors (default "")                                                   |
 | `--dnsBuffer`    |       | Specify the allocated buffer for DNS responses (default 1024)                                                   |
 | `--format`       | `-f`  | Format to print results in (yaml, json, csv) (default "yaml")                                                   |
 | `--nameservers`  | `-n`  | Use specific nameservers, in host[:port] format; may be specified multiple times                                |

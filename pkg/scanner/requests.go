@@ -8,6 +8,21 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	knownDkimSelectors = []string{
+		"x",             // Generic
+		"google",        // Google
+		"selector1",     // Microsoft
+		"selector2",     // Microsoft
+		"k1",            // MailChimp
+		"mandrill",      // Mandrill
+		"everlytickey1", // Everlytic
+		"everlytickey2", // Everlytic
+		"dkim",          // Hetzner
+		"mxvault",       // MxVault
+	}
+)
+
 func (s *Scanner) getDNSAnswers(domain string, recordType uint16) ([]dns.RR, error) {
 	req := new(dns.Msg)
 	req.SetQuestion(dns.Fqdn(domain), recordType)
@@ -133,26 +148,11 @@ func (s *Scanner) getTypeCNAME(domain string) (string, error) {
 	return "", nil
 }
 
-func (s *Scanner) getTypeDKIM(name string) (string, error) {
-	if s.DKIMSelector == "" {
-		s.DKIMSelector = "x"
-	}
+func (s *Scanner) getTypeDKIM(domain string) (string, error) {
+	selectors := append(s.DKIMSelectors, knownDkimSelectors...)
 
-	for _, dname := range []string{
-		s.DKIMSelector + "._domainkey." + name,
-		"email._domainkey." + name,         // Generic
-		"google._domainkey." + name,        // Google
-		"selector1._domainkey." + name,     // Microsoft
-		"selector2._domainkey." + name,     // Microsoft
-		"k1._domainkey." + name,            // MailChimp
-		"mandrill._domainkey." + name,      // Mandrill
-		"everlytickey1._domainkey." + name, // Everlytic
-		"everlytickey2._domainkey." + name, // Everlytic
-		"dkim._domainkey." + name,          // Hetzner
-		"mxvault._domainkey." + name,       // MxVault
-		name,
-	} {
-		txtRecords, err := s.getTypeTXT(dname)
+	for _, selector := range selectors {
+		txtRecords, err := s.getTypeTXT(selector + "._domainkey." + domain)
 		if err != nil {
 			return "", nil
 		}
