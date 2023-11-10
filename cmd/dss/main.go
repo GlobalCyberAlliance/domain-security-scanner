@@ -23,7 +23,7 @@ var (
 		Use:     "dss",
 		Short:   "Scan a domain's DNS records.",
 		Long:    "Scan a domain's DNS records.\nhttps://github.com/GlobalCyberAlliance/DomainSecurityScanner",
-		Version: "2.3.5",
+		Version: "2.3.6",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if debug {
 				log = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).With().Timestamp().Logger().Level(zerolog.DebugLevel)

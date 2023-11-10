@@ -8,27 +8,25 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	knownDkimSelectors = []string{
-		"x",             // Generic
-		"google",        // Google
-		"selector1",     // Microsoft
-		"selector2",     // Microsoft
-		"k1",            // MailChimp
-		"mandrill",      // Mandrill
-		"everlytickey1", // Everlytic
-		"everlytickey2", // Everlytic
-		"dkim",          // Hetzner
-		"mxvault",       // MxVault
-	}
-)
+var knownDkimSelectors = []string{
+	"x",             // Generic
+	"google",        // Google
+	"selector1",     // Microsoft
+	"selector2",     // Microsoft
+	"k1",            // MailChimp
+	"mandrill",      // Mandrill
+	"everlytickey1", // Everlytic
+	"everlytickey2", // Everlytic
+	"dkim",          // Hetzner
+	"mxvault",       // MxVault
+}
 
 func (s *Scanner) getDNSAnswers(domain string, recordType uint16) ([]dns.RR, error) {
 	req := new(dns.Msg)
 	req.SetQuestion(dns.Fqdn(domain), recordType)
 	req.SetEdns0(s.dnsBuffer, true) // increases the response buffer size
 
-	in, _, err := s.dc.Exchange(req, s.GetNS())
+	in, _, err := s.dnsClient.Exchange(req, s.GetNS())
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +36,7 @@ func (s *Scanner) getDNSAnswers(domain string, recordType uint16) ([]dns.RR, err
 
 		req.SetEdns0(4096, true)
 
-		in, _, err = s.dc.Exchange(req, s.GetNS())
+		in, _, err = s.dnsClient.Exchange(req, s.GetNS())
 		if err != nil {
 			return nil, err
 		}

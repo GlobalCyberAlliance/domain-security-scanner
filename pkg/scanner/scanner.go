@@ -71,7 +71,7 @@ type (
 		cacheMutex *sync.Mutex
 
 		// DNS client shared by all goroutines the scanner spawns.
-		dc *dns.Client
+		dnsClient *dns.Client
 
 		// dnsBuffer is used to configure the size of the buffer allocated for
 		// DNS responses
@@ -81,7 +81,7 @@ type (
 		//
 		// This field is managed by atomic operations, and should only ever
 		// be referenced by the (*Scanner).GetNS() method.
-		nsidx uint32
+		lastNameserverIndex uint32
 
 		// A channel to use as a semaphore for limiting the number of DNS
 		// queries that can be made concurrently.
@@ -112,7 +112,7 @@ type (
 // New initializes and returns a new *Scanner.
 func New(options ...ScannerOption) (*Scanner, error) {
 	s := &Scanner{
-		dc:        new(dns.Client),
+		dnsClient: new(dns.Client),
 		dnsBuffer: 1024,
 	}
 
@@ -217,7 +217,7 @@ func WithDnsBuffer(bufferSize uint16) ScannerOption {
 // WithTimeout sets the timeout duration of a DNS query.
 func WithTimeout(timeout time.Duration) ScannerOption {
 	return func(s *Scanner) error {
-		s.dc.Timeout = timeout
+		s.dnsClient.Timeout = timeout
 		return nil
 	}
 }
@@ -287,5 +287,5 @@ func (s *Scanner) Scan(name string) *ScanResult {
 }
 
 func (s *Scanner) GetNS() string {
-	return s.Nameservers[int(atomic.AddUint32(&s.nsidx, 1))%len(s.Nameservers)]
+	return s.Nameservers[int(atomic.AddUint32(&s.lastNameserverIndex, 1))%len(s.Nameservers)]
 }
