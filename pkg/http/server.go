@@ -51,10 +51,6 @@ func NewServer(logger zerolog.Logger) *Server {
 
 	s.router.Use(gin.Logger(), gin.Recovery())
 
-	if err := s.router.SetTrustedProxies([]string{"10.0.0.0/24"}); err != nil {
-		logger.Fatal().Err(err).Msg("failed to set trusted proxies")
-	}
-
 	// Setup error handling routes
 	s.router.NoRoute(func(c *gin.Context) {
 		c.JSON(404, gin.H{"message": "not found"})
