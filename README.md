@@ -59,6 +59,7 @@ You can then get a single domain's results by submitting a GET request like this
 {
   "scanResult": {
     "domain": "globalcyberalliance.org",
+    "elapsed": 221,
     "bimi": "v=BIMI1;l=https://bimi.entrust.net/globalcyberalliance.org/logo.svg;a=https://bimi.entrust.net/globalcyberalliance.org/certchain.pem",
     "dkim": "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCrLHiExVd55zd/IQ/J/mRwSRMAocV/hMB3jXwaHH36d9NaVynQFYV8NaWi69c1veUtRzGt7yAioXqLj7Z4TeEUoOLgrKsn8YnckGs9i3B3tVFB+Ch/4mPhXWiNfNdynHWBcPcbJ8kjEQ2U8y78dHZj1YeRXXVvWob2OaKynO8/lQIDAQAB;",
     "dmarc": "v=DMARC1; p=reject; fo=1; rua=mailto:3941b663@inbox.ondmarc.com,mailto:2zw1qguv@ag.dmarcian.com,mailto:dmarc_agg@vali.email; ruf=mailto:2zw1qguv@fr.dmarcian.com,mailto:gca-ny-sc@globalcyberalliance.org;",
@@ -70,7 +71,6 @@ You can then get a single domain's results by submitting a GET request like this
       "alt4.aspmx.l.google.com."
     ],
     "spf": "v=spf1 include:_u.globalcyberalliance.org._spf.smart.ondmarc.com -all",
-    "duration": 458274508
   },
   "advice": {
     "bimi": [
@@ -114,6 +114,7 @@ Which will return a JSON response like this:
 	{
 		"scanResult": {
 			"domain": "globalcyberalliance.org",
+            "elapsed": 846,
 			"bimi": "v=BIMI1;l=https://bimi.entrust.net/globalcyberalliance.org/logo.svg;a=https://bimi.entrust.net/globalcyberalliance.org/certchain.pem",
             "dkim": "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCrLHiExVd55zd/IQ/J/mRwSRMAocV/hMB3jXwaHH36d9NaVynQFYV8NaWi69c1veUtRzGt7yAioXqLj7Z4TeEUoOLgrKsn8YnckGs9i3B3tVFB+Ch/4mPhXWiNfNdynHWBcPcbJ8kjEQ2U8y78dHZj1YeRXXVvWob2OaKynO8/lQIDAQAB;",
 			"dmarc": "v=DMARC1; p=reject; fo=1; rua=mailto:3941b663@inbox.ondmarc.com,mailto:2zw1qguv@ag.dmarcian.com,mailto:dmarc_agg@vali.email; ruf=mailto:2zw1qguv@fr.dmarcian.com,mailto:gca-ny-sc@globalcyberalliance.org;",
@@ -125,7 +126,6 @@ Which will return a JSON response like this:
 				"alt3.aspmx.l.google.com.",
 				"alt4.aspmx.l.google.com."
 			],
-            "duration": 412142010
 		},
 		"advice": {
 			"bimi": [
@@ -152,13 +152,13 @@ Which will return a JSON response like this:
 	{
 		"scanResult": {
 			"domain": "gcatoolkit.org",
+            "elapsed": 409,
 			"dmarc": "v=DMARC1; p=reject;",
             "mx": [
               "mx01.1and1.com.", 
               "mx00.1and1.com."
             ],
 			"spf": "v=spf1 -all",
-            "duration": 1352755259
 		},
 		"advice": {
 			"bimi": [
