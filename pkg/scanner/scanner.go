@@ -1,21 +1,5 @@
 package scanner
 
-/*
- * Copyright 2018 Global Cyber Alliance
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITION OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 import (
 	"net"
 	"runtime"
@@ -93,19 +77,18 @@ type (
 
 	// ScanResult holds the results of scanning a domain's DNS records.
 	ScanResult struct {
-		Domain   string        `json:"domain" yaml:"domain,omitempty"`
-		A        []string      `json:"a,omitempty" yaml:"a,omitempty"`
-		AAAA     []string      `json:"aaaa,omitempty" yaml:"aaaa,omitempty"`
-		BIMI     string        `json:"bimi,omitempty" yaml:"bimi,omitempty"`
-		CNAME    string        `json:"cname,omitempty" yaml:"cname,omitempty"`
-		DKIM     string        `json:"dkim,omitempty" yaml:"dkim,omitempty"`
-		DMARC    string        `json:"dmarc,omitempty" yaml:"dmarc,omitempty"`
-		MX       []string      `json:"mx,omitempty" yaml:"mx,omitempty"`
-		SPF      string        `json:"spf,omitempty" yaml:"spf,omitempty"`
-		TXT      []string      `json:"txt,omitempty" yaml:"txt,omitempty"`
-		Duration time.Duration `json:"duration,omitempty" yaml:"duration,omitempty"`
-		Err      error         `json:"-" yaml:"-"`
-		Error    string        `json:"error,omitempty" yaml:"error,omitempty"`
+		Domain  string   `json:"domain" yaml:"domain,omitempty"`
+		Elapsed int64    `json:"elapsed,omitempty" yaml:"elapsed,omitempty"`
+		Error   string   `json:"error,omitempty" yaml:"error,omitempty"`
+		A       []string `json:"a,omitempty" yaml:"a,omitempty"`
+		AAAA    []string `json:"aaaa,omitempty" yaml:"aaaa,omitempty"`
+		BIMI    string   `json:"bimi,omitempty" yaml:"bimi,omitempty"`
+		CNAME   string   `json:"cname,omitempty" yaml:"cname,omitempty"`
+		DKIM    string   `json:"dkim,omitempty" yaml:"dkim,omitempty"`
+		DMARC   string   `json:"dmarc,omitempty" yaml:"dmarc,omitempty"`
+		MX      []string `json:"mx,omitempty" yaml:"mx,omitempty"`
+		SPF     string   `json:"spf,omitempty" yaml:"spf,omitempty"`
+		TXT     []string `json:"txt,omitempty" yaml:"txt,omitempty"`
 	}
 )
 
@@ -143,10 +126,13 @@ func ConcurrentScans(n int) ScannerOption {
 		if n <= 0 {
 			n = runtime.NumCPU()
 		}
+
 		if s.sem != nil {
 			close(s.sem)
 		}
+
 		s.sem = make(chan struct{}, n)
+
 		return nil
 	}
 }
@@ -172,7 +158,7 @@ func UseNameservers(ns []string) ScannerOption {
 		// If the provided slice of nameservers is nil, or has zero
 		// elements, load up /etc/resolv.conf, and get the "nameserver"
 		// directives from there.
-		if ns == nil || len(ns) == 0 {
+		if len(ns) == 0 {
 			ns = []string{"8.8.8.8:53", "8.8.4.4:53", "1.1.1.1:53"}
 
 			config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
@@ -181,23 +167,28 @@ func UseNameservers(ns []string) ScannerOption {
 			}
 		}
 
-		// Make sure each of the nameservers is in the "host:port"
-		// format.
+		// Make sure each of the nameservers is in the "host:port" format.
 		//
 		// The "dns" package requires that you explicitly state the port
 		// number for the resolvers that get queried.
-		for i := 0; i < len(ns); i++ {
-			if host, port, err := net.SplitHostPort(ns[i]); err != nil {
+		for i := range ns {
+			host, port, err := net.SplitHostPort(ns[i])
+			if err != nil {
+				// no port is specified
 				if strings.Count(ns[i], ":") > 2 && !strings.Contains(ns[i], "[") {
-					ns[i] = "[" + ns[i] + "]" + ":53"
+					// handle IPv6 addresses without brackets
+					ns[i] = "[" + ns[i] + "]:53"
 				} else {
+					// handle regular addresses or IPv6 with brackets
 					ns[i] = ns[i] + ":53"
 				}
 			} else if port == "" {
 				ns[i] = net.JoinHostPort(host, "53")
 			}
 		}
-		s.Nameservers = ns[:]
+
+		s.Nameservers = ns
+
 		return nil
 	}
 }
@@ -234,49 +225,55 @@ func (s *Scanner) start(src Source, ch chan *ScanResult) {
 	defer close(ch)
 
 	var wg sync.WaitGroup
-	for dname := range src.Read() {
+	for domain := range src.Read() {
 		<-s.sem
 		wg.Add(1)
 		go func(dname string) {
 			ch <- s.Scan(dname)
 			s.sem <- struct{}{}
 			wg.Done()
-		}(dname)
+		}(domain)
 	}
+
 	wg.Wait()
 }
 
 // Scan allows the caller to use the *Scanner's underlying data structures
 // for performing a one-off scan of the given domain name.
-func (s *Scanner) Scan(name string) *ScanResult {
-	if s.cacheEnabled {
-		if val, ok := s.Cache[name]; ok {
-			if val.Expiry.Sub(time.Now()) < (time.Second * 60) {
-				return val.Result
-			}
-
-			s.cacheMutex.Lock()
-			delete(s.Cache, name)
-			s.cacheMutex.Unlock()
+func (s *Scanner) Scan(domain string) *ScanResult {
+	// check that the domain name is valid
+	if _, err := net.LookupHost(domain); err != nil {
+		return &ScanResult{
+			Domain: domain,
+			Error:  "invalid domain name",
 		}
-	}
-
-	var err error
-	res := &ScanResult{Domain: name}
-	start := time.Now()
-
-	if err = s.GetDNSRecords(res, "BIMI", "DKIM", "DMARC", "MX", "SPF"); err != nil {
-		res.Err = errors.Wrap(err, "All")
-	}
-
-	res.Duration = time.Since(start)
-	if res.Err != nil {
-		res.Error = res.Err.Error()
 	}
 
 	if s.cacheEnabled {
 		s.cacheMutex.Lock()
-		s.Cache[name] = cachedResult{
+		if val, ok := s.Cache[domain]; ok {
+			if time.Until(val.Expiry) < time.Minute {
+				s.cacheMutex.Unlock()
+				return val.Result
+			}
+
+			delete(s.Cache, domain)
+		}
+		s.cacheMutex.Unlock()
+	}
+
+	res := &ScanResult{Domain: domain}
+	start := time.Now()
+
+	if err := s.GetDNSRecords(res, "BIMI", "DKIM", "DMARC", "MX", "SPF"); err != nil {
+		res.Error = err.Error()
+	}
+
+	res.Elapsed = time.Since(start).Milliseconds()
+
+	if s.cacheEnabled {
+		s.cacheMutex.Lock()
+		s.Cache[domain] = cachedResult{
 			Expiry: time.Now(),
 			Result: res,
 		}

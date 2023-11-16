@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
+	"github.com/spf13/cast"
 )
 
 type ScanResultWithAdvice struct {
@@ -21,5 +22,5 @@ func (s *ScanResultWithAdvice) Csv() []string {
 		advice += strings.Join(v, "; ")
 	}
 
-	return []string{s.ScanResult.Domain, strings.Join(s.ScanResult.A, "; "), strings.Join(s.ScanResult.AAAA, "; "), s.ScanResult.BIMI, s.ScanResult.CNAME, s.ScanResult.DKIM, s.ScanResult.DMARC, strings.Join(s.ScanResult.MX, "; "), s.ScanResult.SPF, strings.Join(s.ScanResult.TXT, "; "), s.ScanResult.Duration.String(), s.ScanResult.Error, advice}
+	return []string{s.ScanResult.Domain, strings.Join(s.ScanResult.A, "; "), strings.Join(s.ScanResult.AAAA, "; "), s.ScanResult.BIMI, s.ScanResult.CNAME, s.ScanResult.DKIM, s.ScanResult.DMARC, strings.Join(s.ScanResult.MX, "; "), s.ScanResult.SPF, strings.Join(s.ScanResult.TXT, "; "), cast.ToString(s.ScanResult.Elapsed), s.ScanResult.Error, advice}
 }

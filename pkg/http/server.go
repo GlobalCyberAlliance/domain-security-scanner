@@ -3,10 +3,10 @@ package http
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"time"
 
+	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/advisor"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
 	"github.com/didip/tollbooth/v7"
 	"github.com/didip/tollbooth/v7/limiter"
@@ -20,7 +20,6 @@ import (
 type Server struct {
 	handler http.Handler
 	lmt     *limiter.Limiter
-	ln      net.Listener
 	logger  zerolog.Logger
 	server  *http.Server
 	router  *gin.Engine
@@ -30,6 +29,7 @@ type Server struct {
 	Routes   *gin.RouterGroup
 
 	// Services used by the various HTTP routes
+	Advisor *advisor.Advisor
 	Scanner *scanner.Scanner
 }
 

@@ -3,7 +3,6 @@ package http
 import (
 	"strings"
 
-	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/domain_advisor"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/model"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
 	"github.com/gin-gonic/gin"
@@ -24,14 +23,12 @@ func (s *Server) handleScanDomains(c *gin.Context) {
 	switch c.Request.Method {
 	case "GET":
 		domains.Domains = []string{c.Param("domain")}
-		break
 	case "POST":
 		if err := Decode(c, &domains); err != nil {
 			s.logger.Error().Err(err).Msg("error occurred during handleScanDomains request")
 			s.respond(c, 400, "you need to supply an array of domains in the body of the request, formatted as json")
 			return
 		}
-		break
 	default:
 		s.respond(c, 405, "method not allowed")
 		return
@@ -59,10 +56,20 @@ func (s *Server) handleScanDomains(c *gin.Context) {
 	var resultsWithAdvice []model.ScanResultWithAdvice
 
 	for result := range s.Scanner.Start(source) {
-		resultsWithAdvice = append(resultsWithAdvice, model.ScanResultWithAdvice{
+		if result.Error != "" {
+			s.respond(c, 400, result.Error)
+			return
+		}
+
+		scanResult := model.ScanResultWithAdvice{
 			ScanResult: result,
-			Advice:     domainAdvisor.CheckAll(result.BIMI, result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF, s.CheckTls),
-		})
+		}
+
+		if result.Error == "" {
+			scanResult.Advice = s.Advisor.CheckAll(result.BIMI, result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF, s.CheckTls)
+		}
+
+		resultsWithAdvice = append(resultsWithAdvice, scanResult)
 	}
 
 	if len(resultsWithAdvice) == 0 {

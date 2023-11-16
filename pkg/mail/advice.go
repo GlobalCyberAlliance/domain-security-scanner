@@ -1,12 +1,11 @@
 package mail
 
 import (
-	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/domain_advisor"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
 	"github.com/matcornic/hermes/v2"
 )
 
-// PrepareEmail
+// PrepareEmail accepts a scanner.ScanResult and returns a hermes.Email object
 func (s *Server) PrepareEmail(result *scanner.ScanResult) hermes.Email {
 	var mailServers string
 
@@ -64,7 +63,7 @@ func (s *Server) PrepareEmail(result *scanner.ScanResult) hermes.Email {
 }
 
 func (s *Server) domainAdvice(result *scanner.ScanResult) (entries []hermes.Entry) {
-	advice := domainAdvisor.CheckAll(result.BIMI, result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF, s.CheckTls)
+	advice := s.advisor.CheckAll(result.BIMI, result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF, s.CheckTls)
 
 	entries = append(entries, hermes.Entry{
 		Key:   "Domain",

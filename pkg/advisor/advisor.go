@@ -1,4 +1,4 @@
-package domainAdvisor
+package advisor
 
 import (
 	"crypto/tls"
@@ -7,6 +7,7 @@ import (
 	"net/smtp"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cast"
@@ -14,20 +15,40 @@ import (
 
 var emailRegex = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 
-func CheckAll(bimi string, dkim string, dmarc string, domain string, mx []string, spf string, checkTls bool) (advice map[string][]string) {
+type Advisor struct {
+	consumerDomains      map[string]struct{}
+	consumerDomainsMutex *sync.Mutex
+	dialer               *net.Dialer
+}
+
+func NewAdvisor(timeout time.Duration) *Advisor {
+	advisor := Advisor{
+		consumerDomains:      make(map[string]struct{}),
+		consumerDomainsMutex: &sync.Mutex{},
+		dialer:               &net.Dialer{Timeout: timeout},
+	}
+
+	for _, domain := range consumerDomainList {
+		advisor.consumerDomains[domain] = struct{}{}
+	}
+
+	return &advisor
+}
+
+func (a *Advisor) CheckAll(bimi string, dkim string, dmarc string, domain string, mx []string, spf string, checkTls bool) (advice map[string][]string) {
 	advice = make(map[string][]string)
 
-	advice["bimi"] = CheckBIMI(bimi)
-	advice["dkim"] = CheckDKIM(dkim)
-	advice["dmarc"] = CheckDMARC(dmarc)
-	advice["domain"] = CheckDomain(domain, checkTls)
-	advice["mx"] = CheckMX(mx, checkTls)
-	advice["spf"] = CheckSPF(spf)
+	advice["bimi"] = a.CheckBIMI(bimi)
+	advice["dkim"] = a.CheckDKIM(dkim)
+	advice["dmarc"] = a.CheckDMARC(dmarc)
+	advice["domain"] = a.CheckDomain(domain, checkTls)
+	advice["mx"] = a.CheckMX(mx, checkTls)
+	advice["spf"] = a.CheckSPF(spf)
 
 	return advice
 }
 
-func CheckBIMI(bimi string) (advice []string) {
+func (a *Advisor) CheckBIMI(bimi string) (advice []string) {
 	if len(bimi) == 0 {
 		return []string{"We couldn't detect any active BIMI record for your domain. Please visit https://dmarcguide.globalcyberalliance.org to fix this."}
 	}
@@ -102,7 +123,7 @@ func CheckBIMI(bimi string) (advice []string) {
 	return advice
 }
 
-func CheckDKIM(dkim string) (advice []string) {
+func (a *Advisor) CheckDKIM(dkim string) (advice []string) {
 	if dkim == "" {
 		return []string{"We couldn't detect any active DKIM record for your domain. Please visit https://dmarcguide.globalcyberalliance.org to fix this."}
 	}
@@ -139,7 +160,7 @@ func CheckDKIM(dkim string) (advice []string) {
 	return advice
 }
 
-func CheckDMARC(dmarc string) (advice []string) {
+func (a *Advisor) CheckDMARC(dmarc string) (advice []string) {
 	if len(dmarc) == 0 {
 		return []string{"You do not have DMARC setup! Please visit https://dmarcguide.globalcyberalliance.org to set it up."}
 	}
@@ -223,13 +244,16 @@ func CheckDMARC(dmarc string) (advice []string) {
 	return advice
 }
 
-func CheckDomain(domain string, checkTls bool) (advice []string) {
-	if _, ok := consumerDomains[domain]; ok {
+func (a *Advisor) CheckDomain(domain string, checkTls bool) (advice []string) {
+	a.consumerDomainsMutex.Lock()
+	if _, ok := a.consumerDomains[domain]; ok {
+		a.consumerDomainsMutex.Unlock()
 		return []string{"Consumer based accounts (i.e gmail.com, yahoo.com, etc) are controlled by the vendor. They are responsible for setting DKIM, SPF and DMARC capabilities on their domains."}
 	}
+	a.consumerDomainsMutex.Unlock()
 
 	if checkTls {
-		advice = append(advice, checkHostTls(domain, 443)...)
+		advice = append(advice, a.checkHostTls(domain, 443)...)
 	}
 
 	if len(advice) == 0 {
@@ -239,7 +263,7 @@ func CheckDomain(domain string, checkTls bool) (advice []string) {
 	return advice
 }
 
-func CheckMX(mx []string, checkTls bool) (advice []string) {
+func (a *Advisor) CheckMX(mx []string, checkTls bool) (advice []string) {
 	switch len(mx) {
 	case 0:
 		return []string{"You do not have any mail servers setup, so you cannot receive email at this domain."}
@@ -250,7 +274,7 @@ func CheckMX(mx []string, checkTls bool) (advice []string) {
 	if checkTls {
 		for _, serverAddress := range mx {
 			// prepend the hostname to the advice line
-			mxAdvice := checkMailTls(serverAddress)
+			mxAdvice := a.checkMailTls(serverAddress)
 			for _, serverAdvice := range mxAdvice {
 				// strip the trailing dot from DNS records
 				advice = append(advice, serverAddress[:len(serverAddress)-1]+": "+serverAdvice)
@@ -268,11 +292,6 @@ func CheckMX(mx []string, checkTls bool) (advice []string) {
 			}
 		}
 
-		adviceLength := len(advice)
-		if len(mx) == 1 {
-			adviceLength--
-		}
-
 		if counter == len(advice) {
 			return []string{"All of your domains are using TLS 1.3, no further action needed!"}
 		}
@@ -285,7 +304,7 @@ func CheckMX(mx []string, checkTls bool) (advice []string) {
 	return advice
 }
 
-func CheckSPF(spf string) (advice []string) {
+func (a *Advisor) CheckSPF(spf string) (advice []string) {
 	if spf == "" {
 		return []string{"We couldn't detect any active SPF record for your domain. Please visit https://dmarcguide.globalcyberalliance.org to fix this."}
 	}
@@ -301,7 +320,7 @@ func CheckSPF(spf string) (advice []string) {
 	return []string{"SPF seems to be setup correctly! No further action needed."}
 }
 
-func checkHostTls(hostname string, port int) (advice []string) {
+func (a *Advisor) checkHostTls(hostname string, port int) (advice []string) {
 	// strip the trailing dot from DNS records
 	if string(hostname[len(hostname)-1]) == "." {
 		hostname = hostname[:len(hostname)-1]
@@ -311,7 +330,7 @@ func checkHostTls(hostname string, port int) (advice []string) {
 		port = 443
 	}
 
-	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 3 * time.Second}, "tcp", hostname+":"+cast.ToString(port), nil)
+	conn, err := tls.DialWithDialer(a.dialer, "tcp", hostname+":"+cast.ToString(port), nil)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such host") {
 			return []string{hostname + " could not be reached"}
@@ -320,7 +339,7 @@ func checkHostTls(hostname string, port int) (advice []string) {
 		if strings.Contains(err.Error(), "certificate is not trusted") || strings.Contains(err.Error(), "failed to verify certificate") {
 			advice = append(advice, "No valid certificate could be found.")
 
-			conn, err = tls.DialWithDialer(&net.Dialer{Timeout: 3 * time.Second}, "tcp", hostname+":"+cast.ToString(port), &tls.Config{InsecureSkipVerify: true})
+			conn, err = tls.DialWithDialer(a.dialer, "tcp", hostname+":"+cast.ToString(port), &tls.Config{InsecureSkipVerify: true})
 			if err != nil {
 				return advice
 			}
@@ -335,24 +354,33 @@ func checkHostTls(hostname string, port int) (advice []string) {
 	return advice
 }
 
-func checkMailTls(hostname string) (advice []string) {
+func (a *Advisor) checkMailTls(hostname string) (advice []string) {
 	// strip the trailing dot from DNS records
 	if string(hostname[len(hostname)-1]) == "." {
 		hostname = hostname[:len(hostname)-1]
 	}
 
-	conn, err := smtp.Dial(hostname + ":25")
+	conn, err := a.dialer.Dial("tcp", hostname+":25")
 	if err != nil {
+		if strings.Contains(err.Error(), "i/o timeout") {
+			return []string{"Failed to reach domain before timeout"}
+		}
+
 		return []string{"Failed to reach domain"}
 	}
 	defer conn.Close()
+
+	client, err := smtp.NewClient(conn, hostname)
+	if err != nil {
+		return []string{"Failed to reach domain"}
+	}
 
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: false,
 		ServerName:         hostname,
 	}
 
-	if err = conn.StartTLS(tlsConfig); err != nil {
+	if err = client.StartTLS(tlsConfig); err != nil {
 		if strings.Contains(err.Error(), "certificate is not trusted") || strings.Contains(err.Error(), "failed to verify certificate") {
 			advice = append(advice, "No valid certificate could be found.")
 
@@ -361,15 +389,20 @@ func checkMailTls(hostname string) (advice []string) {
 				return append(advice, "Failed to re-attempt connection without certificate verification")
 			}
 
-			conn, err = smtp.Dial(hostname + ":25")
+			conn, err = a.dialer.Dial("tcp", hostname+"25")
 			if err != nil {
-				return append(advice, "Failed to reach domain")
+				return []string{"Failed to reach domain"}
 			}
 			defer conn.Close()
 
+			client, err = smtp.NewClient(conn, hostname)
+			if err != nil {
+				return []string{"Failed to reach domain"}
+			}
+
 			// retry with InsecureSkipVerify
 			tlsConfig.InsecureSkipVerify = true
-			if err = conn.StartTLS(tlsConfig); err != nil {
+			if err = client.StartTLS(tlsConfig); err != nil {
 				return append(advice, "Failed to start TLS connection")
 			}
 		} else {
@@ -377,7 +410,7 @@ func checkMailTls(hostname string) (advice []string) {
 		}
 	}
 
-	if state, ok := conn.TLSConnectionState(); ok {
+	if state, ok := client.TLSConnectionState(); ok {
 		advice = append(advice, checkTlsVersion(state.Version))
 	}
 

@@ -250,9 +250,7 @@ func (s *Scanner) getTypeTXT(domain string) (records []string, err error) {
 
 		answer.Header().Rrtype = dns.TypeTXT
 		if t, ok := answer.(*dns.TXT); ok {
-			for _, txt := range t.Txt {
-				records = append(records, txt)
-			}
+			records = append(records, t.Txt...)
 		}
 	}
 

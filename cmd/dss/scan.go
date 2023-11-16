@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/domain_advisor"
+	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/advisor"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/model"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
 	"github.com/spf13/cobra"
@@ -49,6 +49,8 @@ var cmdScan = &cobra.Command{
 		}
 
 		sc.DKIMSelectors = dkimSelector
+
+		domainAdvisor := advisor.NewAdvisor(time.Duration(timeout) * time.Second)
 
 		if format == "csv" && outputFile == "" {
 			log.Info().Msg("CSV header: domain,A,AAAA,BIMI,CNAME,DKIM,DMARC,MX,SPF,TXT,duration,error,advice")

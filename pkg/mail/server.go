@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	domainAdvisor "github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/advisor"
 	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -11,6 +12,7 @@ import (
 )
 
 type Server struct {
+	advisor  *domainAdvisor.Advisor
 	config   Config
 	interval time.Duration
 	logger   zerolog.Logger
@@ -19,8 +21,9 @@ type Server struct {
 }
 
 // NewMailServer returns a new instance of a mail server
-func NewMailServer(config Config, logger zerolog.Logger, sc *scanner.Scanner) (*Server, error) {
+func NewMailServer(config Config, logger zerolog.Logger, sc *scanner.Scanner, advisor *domainAdvisor.Advisor) (*Server, error) {
 	s := Server{
+		advisor: advisor,
 		config:  config,
 		logger:  logger,
 		Scanner: sc,
