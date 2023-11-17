@@ -1,7 +1,7 @@
 package mail
 
 import (
-	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/scanner"
 	"github.com/matcornic/hermes/v2"
 )
 

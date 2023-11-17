@@ -2,12 +2,12 @@
 The Domain Security Scanner can be used to perform scans against domains for DKIM, DMARC, and SPF DNS records. You can also serve this functionality via an API, or a dedicated mailbox. A web application is also available if organizations would like to perform a single domain scan for DKIM, DMARC or SPF at [https://dmarcguide.globalcyberalliance.org](https://dmarcguide.globalcyberalliance.org).
 
 ## Download
-You can download pre-compiled binaries for macOS, Linux and Windows from the [releases](https://github.com/GlobalCyberAlliance/DomainSecurityScanner/releases) page.
+You can download pre-compiled binaries for macOS, Linux and Windows from the [releases](https://github.com/GlobalCyberAlliance/domain-security-scanner/releases) page.
 
 Alternatively, you can run the binary from within our pre-built Docker image:
 
 ```shell
-docker run ghcr.io/globalcyberalliance/domainsecurityscanner/domainsecurityscanner:latest
+docker run ghcr.io/globalcyberalliance/domain-security-scanner/domain-security-scanner:latest
 ```
 
 ## Build
@@ -15,8 +15,8 @@ docker run ghcr.io/globalcyberalliance/domainsecurityscanner/domainsecurityscann
 To build this application, you'll need [Go](https://golang.org/) installed.
 
 ```shell
-git clone https://github.com/GlobalCyberAlliance/DomainSecurityScanner.git
-cd DomainSecurityScanner
+git clone https://github.com/GlobalCyberAlliance/domain-security-scanner.git
+cd domain-security-scanner
 make
 ```
 

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/model"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/model"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
@@ -22,7 +22,7 @@ var (
 	cmd = &cobra.Command{
 		Use:     "dss",
 		Short:   "Scan a domain's DNS records.",
-		Long:    "Scan a domain's DNS records.\nhttps://github.com/GlobalCyberAlliance/DomainSecurityScanner",
+		Long:    "Scan a domain's DNS records.\nhttps://github.com/GlobalCyberAlliance/domain-security-scanner",
 		Version: "2.4.1",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if debug {

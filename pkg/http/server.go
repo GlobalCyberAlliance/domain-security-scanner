@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/advisor"
-	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/advisor"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/scanner"
 	"github.com/didip/tollbooth/v7"
 	"github.com/didip/tollbooth/v7/limiter"
 	"github.com/gin-gonic/gin"

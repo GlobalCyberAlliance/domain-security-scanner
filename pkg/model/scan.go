@@ -3,7 +3,7 @@ package model
 import (
 	"strings"
 
-	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/scanner"
 	"github.com/spf13/cast"
 )
 

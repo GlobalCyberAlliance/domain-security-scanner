@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/advisor"
-	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/model"
-	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/advisor"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/model"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/scanner"
 	"github.com/spf13/cobra"
 )
 

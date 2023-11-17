@@ -1,4 +1,4 @@
-module github.com/GlobalCyberAlliance/DomainSecurityScanner
+module github.com/GlobalCyberAlliance/domain-security-scanner
 
 go 1.20
 

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"time"
 
-	domainAdvisor "github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/advisor"
-	"github.com/GlobalCyberAlliance/DomainSecurityScanner/pkg/scanner"
+	domainAdvisor "github.com/GlobalCyberAlliance/domain-security-scanner/pkg/advisor"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/scanner"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cast"
