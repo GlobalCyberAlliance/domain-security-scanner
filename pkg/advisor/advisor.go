@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/smtp"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -15,11 +16,28 @@ import (
 
 var emailRegex = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 
-type Advisor struct {
-	consumerDomains      map[string]struct{}
-	consumerDomainsMutex *sync.Mutex
-	dialer               *net.Dialer
-}
+type (
+	Advisor struct {
+		consumerDomains      map[string]struct{}
+		consumerDomainsMutex *sync.Mutex
+		dialer               *net.Dialer
+	}
+
+	// dmarc represents the structure of a DMARC record
+	dmarc struct {
+		Version                    string
+		Policy                     string
+		SubdomainPolicy            string
+		Percentage                 int
+		AggregateReportDestination []string
+		ForensicReportDestination  []string
+		FailureOptions             string
+		ASPF                       string
+		ADKIM                      string
+		ReportInterval             int
+		Advice                     []string
+	}
+)
 
 func NewAdvisor(timeout time.Duration) *Advisor {
 	advisor := Advisor{
@@ -160,88 +178,140 @@ func (a *Advisor) CheckDKIM(dkim string) (advice []string) {
 	return advice
 }
 
-func (a *Advisor) CheckDMARC(dmarc string) (advice []string) {
-	if len(dmarc) == 0 {
-		return []string{"You do not have DMARC setup! Please visit https://dmarcguide.globalcyberalliance.org to set it up."}
+func (a *Advisor) CheckDMARC(record string) (advice []string) {
+	if record == "" {
+		return []string{"You do not have DMARC setup!"}
 	}
 
-	if strings.Contains(dmarc, ";") {
-		dmarcResult := strings.Split(dmarc, ";")
-
-		for index, tag := range dmarcResult {
-			tag = strings.TrimSpace(tag)
-
-			switch index {
-			case 0:
-				if !strings.Contains(tag, "v=DMARC1") {
-					advice = append(advice, "The beginning of your DMARC record should be v=DMARC1 with specific capitalization.")
-				}
-			case 1:
-				if strings.Contains(tag, "p=") && !strings.Contains(tag, "sp=") {
-					ruaExists := false
-					tagValue := strings.TrimPrefix(tag, "p=")
-
-					if strings.Contains(dmarc, "rua=") {
-						ruaExists = true
-					}
-
-					switch tagValue {
-					case "quarantine":
-						if ruaExists {
-							advice = append(advice, "You are currently at the second level and receiving reports. Please make sure to review the reports, make the appropriate adjustments, and move to reject soon.")
-						} else {
-							advice = append(advice, "You are currently at the second level. However, you must receive reports in order to determine if DKIM/DMARC/SPF are functioning correctly and move to the highest level (reject). Please add the ‘rua’ tag to your DMARC policy.")
-						}
-					case "none":
-						if ruaExists {
-							advice = append(advice, "You are currently at the lowest level and receiving reports, which is a great starting point. Please make sure to review the reports, make the appropriate adjustments, and move to either quarantine or reject soon.")
-						} else {
-							advice = append(advice, "You are currently at the lowest level, which is a great starting point. However, you must receive reports in order to determine if DKIM/DMARC/SPF are functioning correctly. Please add the ‘rua’ tag to your DMARC policy.")
-						}
-					case "reject":
-						if ruaExists {
-							advice = append(advice, "You are at the highest level! Please make sure to continue reviewing the reports and make the appropriate adjustments, if needed.")
-						} else {
-							advice = append(advice, "You are at the highest level! However, we do recommend keeping reports enabled (via the rua tag) in case any issues may arise and you can review reports to see if DMARC is the cause.")
-						}
-					default:
-						advice = append(advice, "Invalid DMARC policy specified, the record must be p=none/p=quarantine/p=reject.")
-					}
-				} else {
-					advice = append(advice, "The second tag in your DMARC record must be p=none/p=quarantine/p=reject.")
-				}
-			default:
-				if strings.Contains(tag, "rua=") {
-					trimmedTag := strings.TrimPrefix(tag, "rua=")
-					tagArray := strings.Split(trimmedTag, ",")
-
-					var invalidAddress, missingMailto bool
-					for _, address := range tagArray {
-						if !strings.Contains(address, "mailto:") {
-							missingMailto = true
-						} else {
-							trimmedAddress := strings.TrimPrefix(address, "mailto:")
-							if !validateEmail(trimmedAddress) {
-								invalidAddress = true
-							}
-						}
-					}
-
-					if missingMailto {
-						advice = append(advice, "Each email address under the rua tag should contain a mailto: prefix. Example: rua=mailto:dmarc@globalcyberalliance.org,mailto:dmarc2@globalcyberalliance.org.")
-					}
-
-					if invalidAddress {
-						advice = append(advice, "Your rua tag contains invalid email addresses.")
-					}
-				}
-			}
-		}
-	} else {
+	if !strings.Contains(record, ";") {
 		return []string{"Your DMARC record appears to be malformed as no semicolons seem to be present."}
 	}
 
-	return advice
+	dmarcRecord := dmarc{}
+	parts := strings.Split(record, ";")
+	ruaExists := strings.Contains(record, "rua=")
+
+	for index, part := range parts {
+		keyValue := strings.SplitN(strings.TrimSpace(part), "=", 2)
+		if len(keyValue) != 2 {
+			continue
+		}
+
+		key := keyValue[0]
+		value := keyValue[1]
+
+		switch key {
+		case "v":
+			if index != 0 || value != "DMARC1" {
+				dmarcRecord.Advice = append(dmarcRecord.Advice, "The beginning of your DMARC record should be v=DMARC1 with specific capitalization.")
+			}
+
+			dmarcRecord.Version = value
+		case "p":
+			if index != 1 {
+				dmarcRecord.Advice = append(dmarcRecord.Advice, "The second tag in your DMARC record must be p=none/p=quarantine/p=reject.")
+			}
+
+			dmarcRecord.Policy = value
+
+			switch dmarcRecord.Policy {
+			case "quarantine":
+				if ruaExists {
+					dmarcRecord.Advice = append(dmarcRecord.Advice, "You are currently at the second level and receiving reports. Please make sure to review the reports, make the appropriate adjustments, and move to reject soon.")
+				} else {
+					dmarcRecord.Advice = append(dmarcRecord.Advice, "You are currently at the second level. However, you must receive reports in order to determine if DKIM/DMARC/SPF are functioning correctly and move to the highest level (reject). Please add the ‘rua’ tag to your DMARC policy.")
+				}
+			case "none":
+				if ruaExists {
+					dmarcRecord.Advice = append(dmarcRecord.Advice, "You are currently at the lowest level and receiving reports, which is a great starting point. Please make sure to review the reports, make the appropriate adjustments, and move to either quarantine or reject soon.")
+				} else {
+					dmarcRecord.Advice = append(dmarcRecord.Advice, "You are currently at the lowest level, which is a great starting point. However, you must receive reports in order to determine if DKIM/DMARC/SPF are functioning correctly. Please add the ‘rua’ tag to your DMARC policy.")
+				}
+			case "reject":
+				if ruaExists {
+					dmarcRecord.Advice = append(dmarcRecord.Advice, "You are at the highest level! Please make sure to continue reviewing the reports and make the appropriate adjustments, if needed.")
+				} else {
+					dmarcRecord.Advice = append(dmarcRecord.Advice, "You are at the highest level! However, we do recommend keeping reports enabled (via the rua tag) in case any issues may arise and you can review reports to see if DMARC is the cause.")
+				}
+			default:
+				dmarcRecord.Advice = append(dmarcRecord.Advice, "Invalid DMARC policy specified, the record must be p=none/p=quarantine/p=reject.")
+			}
+		case "sp":
+			dmarcRecord.SubdomainPolicy = value
+
+			if dmarcRecord.SubdomainPolicy != "none" && dmarcRecord.SubdomainPolicy != "quarantine" && dmarcRecord.SubdomainPolicy != "reject" {
+				dmarcRecord.Advice = append(dmarcRecord.Advice, "Invalid subdomain policy specified, the record must be sp=none/sp=quarantine/sp=reject.")
+			}
+		case "pct":
+			pct, err := strconv.Atoi(value)
+			if err != nil || pct < 0 || pct > 100 {
+				dmarcRecord.Advice = append(dmarcRecord.Advice, "Invalid report percentage specified, it must be between 0 and 100.")
+			}
+
+			dmarcRecord.Percentage = pct
+		case "rua":
+			dmarcRecord.AggregateReportDestination = strings.Split(value, ",")
+			for _, destination := range dmarcRecord.AggregateReportDestination {
+				if !strings.HasPrefix(destination, "mailto:") {
+					dmarcRecord.Advice = append(dmarcRecord.Advice, "Invalid aggregate report destination specified, it should begin with mailto:.")
+				}
+
+				if !validateEmail(strings.TrimPrefix(destination, "mailto:")) {
+					dmarcRecord.Advice = append(dmarcRecord.Advice, "Invalid aggregate report destination specified, it should be a valid email address.")
+				}
+			}
+		case "ruf":
+			dmarcRecord.ForensicReportDestination = strings.Split(value, ",")
+			for _, destination := range dmarcRecord.ForensicReportDestination {
+				if !strings.HasPrefix(destination, "mailto:") {
+					dmarcRecord.Advice = append(dmarcRecord.Advice, "Invalid forensic report destination specified, it should begin with mailto:.")
+					continue
+				}
+
+				if !validateEmail(strings.TrimPrefix(destination, "mailto:")) {
+					dmarcRecord.Advice = append(dmarcRecord.Advice, "Invalid forensic report destination specified, it should be a valid email address.")
+				}
+			}
+		case "fo":
+			dmarcRecord.FailureOptions = value
+			if dmarcRecord.FailureOptions != "0" && dmarcRecord.FailureOptions != "1" && dmarcRecord.FailureOptions != "d" && dmarcRecord.FailureOptions != "s" {
+				dmarcRecord.Advice = append(dmarcRecord.Advice, "Invalid failure options specified, the record must be fo=0/fo=1/fo=d/fo=s.")
+			}
+		case "aspf":
+			dmarcRecord.ASPF = value
+		case "adkim":
+			dmarcRecord.ADKIM = value
+		case "ri":
+			ri, err := strconv.Atoi(value)
+			if err != nil {
+				dmarcRecord.Advice = append(dmarcRecord.Advice, "Invalid report interval specified, it must be a positive integer.")
+			}
+
+			if ri < 0 {
+				dmarcRecord.Advice = append(dmarcRecord.Advice, "Invalid report interval specified, it must be a positive value.")
+			}
+
+			dmarcRecord.ReportInterval = ri
+		}
+	}
+
+	if len(dmarcRecord.AggregateReportDestination) == 0 {
+		dmarcRecord.Advice = append(dmarcRecord.Advice, "Consider specifying a 'rua' tag for aggregate reporting.")
+	}
+
+	if dmarcRecord.FailureOptions == "" {
+		dmarcRecord.Advice = append(dmarcRecord.Advice, "Consider specifying an 'fo' tag to define the condition for generating failure reports. Default is '0' (report if both SPF and DKIM fail).")
+	}
+
+	if len(dmarcRecord.ForensicReportDestination) == 0 {
+		dmarcRecord.Advice = append(dmarcRecord.Advice, "Consider specifying a 'ruf' tag for forensic reporting.")
+	}
+
+	if dmarcRecord.SubdomainPolicy == "" {
+		dmarcRecord.Advice = append(dmarcRecord.Advice, "Subdomain policy isn't specified, they'll default to the main policy instead.")
+	}
+
+	return dmarcRecord.Advice
 }
 
 func (a *Advisor) CheckDomain(domain string, checkTls bool) (advice []string) {
@@ -269,6 +339,8 @@ func (a *Advisor) CheckMX(mx []string, checkTls bool) (advice []string) {
 		return []string{"You do not have any mail servers setup, so you cannot receive email at this domain."}
 	case 1:
 		advice = []string{"You have a single mail server setup, but it's recommended that you have at least two setup in case the first one fails."}
+	default:
+		advice = []string{"You have multiple mail servers setup, which is recommended."}
 	}
 
 	if checkTls {

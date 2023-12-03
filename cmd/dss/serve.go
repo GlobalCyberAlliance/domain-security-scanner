@@ -53,7 +53,7 @@ var (
 				scanner.ConcurrentScans(concurrent),
 				scanner.UseCache(cache),
 				scanner.UseNameservers(nameservers),
-				scanner.WithDnsBuffer(dnsBuffer),
+				scanner.WithDNSBuffer(dnsBuffer),
 				scanner.WithTimeout(time.Duration(timeout) * time.Second),
 			}
 
@@ -78,7 +78,7 @@ var (
 				scanner.ConcurrentScans(concurrent),
 				scanner.UseCache(cache),
 				scanner.UseNameservers(nameservers),
-				scanner.WithDnsBuffer(dnsBuffer),
+				scanner.WithDNSBuffer(dnsBuffer),
 				scanner.WithTimeout(time.Duration(timeout) * time.Second),
 			}
 

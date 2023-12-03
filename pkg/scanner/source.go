@@ -97,16 +97,17 @@ func TextSource(r io.Reader) Source {
 }
 
 type textSource struct {
-	reader io.Reader
 	ch     chan string
-	stop   chan struct{}
 	closed bool
+	reader io.Reader
+	stop   chan struct{}
 }
 
 func (src *textSource) Read() <-chan string {
 	if src.closed {
 		return nil
 	}
+
 	if src.ch != nil {
 		return src.ch
 	}

@@ -64,6 +64,8 @@ func (s *Scanner) GetDNSRecords(scanResult *ScanResult, recordTypes ...string) (
 			scanResult.DMARC, err = s.getTypeDMARC(scanResult.Domain)
 		case "MX":
 			scanResult.MX, err = s.getTypeMX(scanResult.Domain)
+		case "NS":
+			scanResult.NS, err = s.getTypeNS(scanResult.Domain)
 		case "SPF":
 			scanResult.SPF, err = s.getTypeSPF(scanResult.Domain)
 		case "TXT":
@@ -196,6 +198,21 @@ func (s *Scanner) getTypeMX(domain string) (records []string, err error) {
 	for _, answer := range answers {
 		if t, ok := answer.(*dns.MX); ok {
 			records = append(records, t.Mx)
+		}
+	}
+
+	return records, nil
+}
+
+func (s *Scanner) getTypeNS(domain string) (records []string, err error) {
+	answers, err := s.getDNSAnswers(domain, dns.TypeNS)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, answer := range answers {
+		if t, ok := answer.(*dns.NS); ok {
+			records = append(records, t.Ns)
 		}
 	}
 

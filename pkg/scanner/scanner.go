@@ -51,7 +51,7 @@ type (
 		// cache or not.
 		cacheEnabled bool
 
-		// cacheMutex prevents concurrent map writes.
+		// cacheMutex prevents concurrent map writes
 		cacheMutex *sync.Mutex
 
 		// DNS client shared by all goroutines the scanner spawns.
@@ -87,6 +87,7 @@ type (
 		DKIM    string   `json:"dkim,omitempty" yaml:"dkim,omitempty"`
 		DMARC   string   `json:"dmarc,omitempty" yaml:"dmarc,omitempty"`
 		MX      []string `json:"mx,omitempty" yaml:"mx,omitempty"`
+		NS      []string `json:"ns,omitempty" yaml:"ns,omitempty"`
 		SPF     string   `json:"spf,omitempty" yaml:"spf,omitempty"`
 		TXT     []string `json:"txt,omitempty" yaml:"txt,omitempty"`
 	}
@@ -187,14 +188,14 @@ func UseNameservers(ns []string) ScannerOption {
 			}
 		}
 
-		s.Nameservers = ns
+		s.Nameservers = ns[:]
 
 		return nil
 	}
 }
 
-// WithDnsBuffer increases the allocated buffer for DNS responses
-func WithDnsBuffer(bufferSize uint16) ScannerOption {
+// WithDNSBuffer increases the allocated buffer for DNS responses
+func WithDNSBuffer(bufferSize uint16) ScannerOption {
 	return func(s *Scanner) error {
 		if bufferSize > 4096 {
 			return errors.New("buffer size should not be larger than 4096")
@@ -241,18 +242,10 @@ func (s *Scanner) start(src Source, ch chan *ScanResult) {
 // Scan allows the caller to use the *Scanner's underlying data structures
 // for performing a one-off scan of the given domain name.
 func (s *Scanner) Scan(domain string) *ScanResult {
-	// check that the domain name is valid
-	if _, err := net.LookupHost(domain); err != nil {
-		return &ScanResult{
-			Domain: domain,
-			Error:  "invalid domain name",
-		}
-	}
-
 	if s.cacheEnabled {
 		s.cacheMutex.Lock()
 		if val, ok := s.Cache[domain]; ok {
-			if time.Until(val.Expiry) < time.Minute {
+			if time.Now().Before(val.Expiry) {
 				s.cacheMutex.Unlock()
 				return val.Result
 			}
@@ -262,10 +255,18 @@ func (s *Scanner) Scan(domain string) *ScanResult {
 		s.cacheMutex.Unlock()
 	}
 
+	// check that the domain name is valid
+	if _, err := net.LookupHost(domain); err != nil {
+		return &ScanResult{
+			Domain: domain,
+			Error:  "invalid domain name",
+		}
+	}
+
 	res := &ScanResult{Domain: domain}
 	start := time.Now()
 
-	if err := s.GetDNSRecords(res, "BIMI", "DKIM", "DMARC", "MX", "SPF"); err != nil {
+	if err := s.GetDNSRecords(res, "BIMI", "DKIM", "DMARC", "MX", "NS", "SPF"); err != nil {
 		res.Error = err.Error()
 	}
 
@@ -274,7 +275,7 @@ func (s *Scanner) Scan(domain string) *ScanResult {
 	if s.cacheEnabled {
 		s.cacheMutex.Lock()
 		s.Cache[domain] = cachedResult{
-			Expiry: time.Now(),
+			Expiry: time.Now().Add(time.Minute),
 			Result: res,
 		}
 		s.cacheMutex.Unlock()
