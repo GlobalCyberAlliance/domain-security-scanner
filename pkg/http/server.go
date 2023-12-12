@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/didip/tollbooth/v7"
 	"github.com/didip/tollbooth/v7/limiter"
 	"github.com/gin-gonic/gin"
+	"github.com/goccy/go-json"
 	"github.com/rs/cors"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cast"
@@ -37,7 +37,7 @@ type Server struct {
 func NewServer(logger zerolog.Logger) *Server {
 	gin.SetMode(gin.ReleaseMode)
 
-	rateLimiter := tollbooth.NewLimiter(10, &limiter.ExpirableOptions{DefaultExpirationTTL: time.Hour})
+	rateLimiter := tollbooth.NewLimiter(3, &limiter.ExpirableOptions{DefaultExpirationTTL: time.Hour})
 	rateLimiter.SetIPLookups([]string{"RemoteAddr", "X-Forwarded-For", "X-Real-IP"}).
 		SetMethods([]string{"GET", "POST"})
 

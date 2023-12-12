@@ -51,7 +51,7 @@ var (
 
 			opts := []scanner.ScannerOption{
 				scanner.ConcurrentScans(concurrent),
-				scanner.UseCache(cache),
+				scanner.UseCache(cacheEnabled),
 				scanner.UseNameservers(nameservers),
 				scanner.WithDNSBuffer(dnsBuffer),
 				scanner.WithTimeout(time.Duration(timeout) * time.Second),
@@ -62,7 +62,7 @@ var (
 				log.Fatal().Err(err).Msg("could not create domain scanner")
 			}
 
-			server.Advisor = advisor.NewAdvisor(time.Duration(timeout) * time.Second)
+			server.Advisor = advisor.NewAdvisor(time.Duration(timeout)*time.Second, cacheEnabled)
 			server.CheckTls = checkTls
 			server.Scanner = sc
 
@@ -76,7 +76,7 @@ var (
 		Run: func(command *cobra.Command, args []string) {
 			opts := []scanner.ScannerOption{
 				scanner.ConcurrentScans(concurrent),
-				scanner.UseCache(cache),
+				scanner.UseCache(cacheEnabled),
 				scanner.UseNameservers(nameservers),
 				scanner.WithDNSBuffer(dnsBuffer),
 				scanner.WithTimeout(time.Duration(timeout) * time.Second),
@@ -87,7 +87,7 @@ var (
 				log.Fatal().Err(err).Msg("could not create scanner")
 			}
 
-			mailServer, err := mail.NewMailServer(mailConfig, log, sc, advisor.NewAdvisor(time.Duration(timeout)*time.Second))
+			mailServer, err := mail.NewMailServer(mailConfig, log, sc, advisor.NewAdvisor(time.Duration(timeout)*time.Second, cacheEnabled))
 			if err != nil {
 				log.Fatal().Err(err).Msg("could not open mail server connection")
 			}

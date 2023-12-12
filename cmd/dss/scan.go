@@ -23,7 +23,7 @@ var cmdScan = &cobra.Command{
 	Run: func(command *cobra.Command, args []string) {
 		opts := []scanner.ScannerOption{
 			scanner.ConcurrentScans(concurrent),
-			scanner.UseCache(cache),
+			scanner.UseCache(cacheEnabled),
 			scanner.UseNameservers(nameservers),
 			scanner.WithDNSBuffer(dnsBuffer),
 			scanner.WithTimeout(time.Duration(timeout) * time.Second),
@@ -50,7 +50,7 @@ var cmdScan = &cobra.Command{
 
 		sc.DKIMSelectors = dkimSelector
 
-		domainAdvisor := advisor.NewAdvisor(time.Duration(timeout) * time.Second)
+		domainAdvisor := advisor.NewAdvisor(time.Duration(timeout)*time.Second, cacheEnabled)
 
 		if format == "csv" && outputFile == "" {
 			log.Info().Msg("CSV header: domain,A,AAAA,BIMI,CNAME,DKIM,DMARC,MX,SPF,TXT,duration,error,advice")

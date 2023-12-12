@@ -10,6 +10,7 @@ require (
 	github.com/goccy/go-json v0.10.2
 	github.com/matcornic/hermes/v2 v2.1.0
 	github.com/miekg/dns v1.1.57
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/rs/cors v1.10.1
 	github.com/rs/zerolog v1.31.0

@@ -2,6 +2,7 @@ package advisor
 
 import (
 	"crypto/tls"
+	"github.com/patrickmn/go-cache"
 	"net"
 	"net/http"
 	"net/smtp"
@@ -21,6 +22,9 @@ type (
 		consumerDomains      map[string]struct{}
 		consumerDomainsMutex *sync.Mutex
 		dialer               *net.Dialer
+		tlsCacheEnabled      bool
+		tlsCacheHost         *cache.Cache
+		tlsCacheMail         *cache.Cache
 	}
 
 	// dmarc represents the structure of a DMARC record
@@ -39,11 +43,17 @@ type (
 	}
 )
 
-func NewAdvisor(timeout time.Duration) *Advisor {
+func NewAdvisor(timeout time.Duration, tlsCacheEnabled bool) *Advisor {
 	advisor := Advisor{
 		consumerDomains:      make(map[string]struct{}),
 		consumerDomainsMutex: &sync.Mutex{},
 		dialer:               &net.Dialer{Timeout: timeout},
+		tlsCacheEnabled:      tlsCacheEnabled,
+	}
+
+	if tlsCacheEnabled {
+		advisor.tlsCacheHost = cache.New(1*time.Minute, 5*time.Minute)
+		advisor.tlsCacheMail = cache.New(1*time.Minute, 5*time.Minute)
 	}
 
 	for _, domain := range consumerDomainList {
@@ -398,6 +408,12 @@ func (a *Advisor) checkHostTls(hostname string, port int) (advice []string) {
 		hostname = hostname[:len(hostname)-1]
 	}
 
+	if a.tlsCacheEnabled {
+		if tlsAdvice, ok := a.tlsCacheHost.Get(hostname); ok {
+			return tlsAdvice.([]string)
+		}
+	}
+
 	if port == 0 {
 		port = 443
 	}
@@ -423,6 +439,10 @@ func (a *Advisor) checkHostTls(hostname string, port int) (advice []string) {
 
 	advice = append(advice, checkTlsVersion(conn.ConnectionState().Version))
 
+	if a.tlsCacheEnabled {
+		a.tlsCacheHost.Set(hostname, advice, 1*time.Minute)
+	}
+
 	return advice
 }
 
@@ -430,6 +450,12 @@ func (a *Advisor) checkMailTls(hostname string) (advice []string) {
 	// strip the trailing dot from DNS records
 	if string(hostname[len(hostname)-1]) == "." {
 		hostname = hostname[:len(hostname)-1]
+	}
+
+	if a.tlsCacheEnabled {
+		if tlsAdvice, ok := a.tlsCacheMail.Get(hostname); ok {
+			return tlsAdvice.([]string)
+		}
 	}
 
 	conn, err := a.dialer.Dial("tcp", hostname+":25")
@@ -484,6 +510,10 @@ func (a *Advisor) checkMailTls(hostname string) (advice []string) {
 
 	if state, ok := client.TLSConnectionState(); ok {
 		advice = append(advice, checkTlsVersion(state.Version))
+	}
+
+	if a.tlsCacheEnabled {
+		a.tlsCacheMail.Set(hostname, advice, 1*time.Minute)
 	}
 
 	return advice

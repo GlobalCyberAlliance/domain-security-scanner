@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 )
 
@@ -27,18 +28,9 @@ var (
 )
 
 type (
-	cachedResult struct {
-		Expiry time.Time
-		Result *ScanResult
-	}
-
 	// Scanner is a type that queries the DNS records for domain names, looking
 	// for specific resource records.
 	Scanner struct {
-		// Cache is a simple in-memory cache to reduce external requests from
-		// the scanner.
-		Cache map[string]cachedResult
-
 		// DKIMSelectors is used to specify where a DKIM record is hosted for
 		// a specific domain.
 		DKIMSelectors []string
@@ -47,12 +39,13 @@ type (
 		// issue queries against.
 		Nameservers []string
 
+		// cache is a simple in-memory cache to reduce external requests from
+		// the scanner.
+		cache *cache.Cache
+
 		// cacheEnabled specifies whether the scanner should utilize the in-memory
 		// cache or not.
 		cacheEnabled bool
-
-		// cacheMutex prevents concurrent map writes
-		cacheMutex *sync.Mutex
 
 		// DNS client shared by all goroutines the scanner spawns.
 		dnsClient *dns.Client
@@ -143,9 +136,8 @@ func ConcurrentScans(n int) ScannerOption {
 func UseCache(enable bool) ScannerOption {
 	return func(s *Scanner) error {
 		if enable {
-			s.Cache = make(map[string]cachedResult, 100)
+			s.cache = cache.New(1*time.Minute, 5*time.Minute)
 			s.cacheEnabled = true
-			s.cacheMutex = &sync.Mutex{}
 		}
 		return nil
 	}
@@ -243,16 +235,9 @@ func (s *Scanner) start(src Source, ch chan *ScanResult) {
 // for performing a one-off scan of the given domain name.
 func (s *Scanner) Scan(domain string) *ScanResult {
 	if s.cacheEnabled {
-		s.cacheMutex.Lock()
-		if val, ok := s.Cache[domain]; ok {
-			if time.Now().Before(val.Expiry) {
-				s.cacheMutex.Unlock()
-				return val.Result
-			}
-
-			delete(s.Cache, domain)
+		if scanResult, ok := s.cache.Get(domain); ok {
+			return scanResult.(*ScanResult)
 		}
-		s.cacheMutex.Unlock()
 	}
 
 	// check that the domain name is valid
@@ -274,12 +259,7 @@ func (s *Scanner) Scan(domain string) *ScanResult {
 	res.Elapsed = time.Since(start).Milliseconds()
 
 	if s.cacheEnabled {
-		s.cacheMutex.Lock()
-		s.Cache[domain] = cachedResult{
-			Expiry: time.Now().Add(time.Minute),
-			Result: res,
-		}
-		s.cacheMutex.Unlock()
+		s.cache.Set(domain, res, 1*time.Minute)
 	}
 
 	return res

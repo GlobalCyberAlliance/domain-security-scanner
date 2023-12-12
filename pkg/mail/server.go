@@ -1,8 +1,8 @@
 package mail
 
 import (
+	"github.com/patrickmn/go-cache"
 	"strings"
-	"sync"
 	"time"
 
 	domainAdvisor "github.com/GlobalCyberAlliance/domain-security-scanner/pkg/advisor"
@@ -13,25 +13,23 @@ import (
 )
 
 type Server struct {
-	advisor       *domainAdvisor.Advisor
-	config        Config
-	cooldown      map[string]time.Time
-	cooldownMutex sync.Mutex
-	interval      time.Duration
-	logger        zerolog.Logger
-	CheckTls      bool
-	Scanner       *scanner.Scanner
+	advisor  *domainAdvisor.Advisor
+	config   Config
+	cooldown *cache.Cache
+	interval time.Duration
+	logger   zerolog.Logger
+	CheckTls bool
+	Scanner  *scanner.Scanner
 }
 
 // NewMailServer returns a new instance of a mail server
 func NewMailServer(config Config, logger zerolog.Logger, sc *scanner.Scanner, advisor *domainAdvisor.Advisor) (*Server, error) {
 	s := Server{
-		advisor:       advisor,
-		cooldown:      make(map[string]time.Time),
-		cooldownMutex: sync.Mutex{},
-		config:        config,
-		logger:        logger,
-		Scanner:       sc,
+		advisor:  advisor,
+		config:   config,
+		cooldown: cache.New(1*time.Minute, 5*time.Minute),
+		logger:   logger,
+		Scanner:  sc,
 	}
 
 	client, err := s.Login()
@@ -67,21 +65,16 @@ func (s *Server) handler() error {
 				s.logger.Error().Err(err).Msg("could not obtain the latest mail from mail server")
 			}
 
-			s.cooldownMutex.Lock()
-
 			var domainList []string
 			for domain := range addresses {
-				// skip domains that are still on cooldown
-				if _, ok := s.cooldown[domain]; ok && s.cooldown[domain].Before(time.Now()) {
+				if _, ok := s.cooldown.Get(domain); ok {
 					continue
 				}
 
-				s.cooldown[domain] = time.Now().Add(1 * time.Minute)
+				s.cooldown.Set(domain, "", 1*time.Minute)
 
 				domainList = append(domainList, domain)
 			}
-
-			s.cooldownMutex.Unlock()
 
 			sourceDomainList := strings.NewReader(strings.Join(domainList, "\n"))
 			source := scanner.TextSource(sourceDomainList)

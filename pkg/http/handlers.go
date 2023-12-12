@@ -1,13 +1,13 @@
 package http
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/goccy/go-json"
 	"github.com/spf13/cast"
 )
 

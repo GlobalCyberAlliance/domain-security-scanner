@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"os"
 	"runtime"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/model"
+	"github.com/goccy/go-json"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
@@ -23,7 +23,7 @@ var (
 		Use:     "dss",
 		Short:   "Scan a domain's DNS records.",
 		Long:    "Scan a domain's DNS records.\nhttps://github.com/GlobalCyberAlliance/domain-security-scanner",
-		Version: "2.4.3",
+		Version: "2.4.4",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if debug {
 				log = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).With().Timestamp().Logger().Level(zerolog.DebugLevel)
@@ -43,19 +43,19 @@ var (
 			}
 		},
 	}
-	cfg                                      *Config
-	log                                      zerolog.Logger
-	concurrent, writeToFileCounter           int
-	format, outputFile                       string
-	dkimSelector, nameservers                []string
-	timeout                                  int64
-	advise, debug, cache, checkTls, zoneFile bool
-	dnsBuffer                                uint16
+	cfg                                             *Config
+	log                                             zerolog.Logger
+	concurrent, writeToFileCounter                  int
+	format, outputFile                              string
+	dkimSelector, nameservers                       []string
+	timeout                                         int64
+	advise, debug, cacheEnabled, checkTls, zoneFile bool
+	dnsBuffer                                       uint16
 )
 
 func main() {
 	cmd.PersistentFlags().BoolVarP(&advise, "advise", "a", false, "Provide suggestions for incorrect/missing mail security features")
-	cmd.PersistentFlags().BoolVar(&cache, "cache", false, "Cache scan results for 60 seconds")
+	cmd.PersistentFlags().BoolVar(&cacheEnabled, "cache", false, "cache scan results for 60 seconds")
 	cmd.PersistentFlags().BoolVar(&checkTls, "checkTls", false, "Check the TLS connectivity and cert validity of domains")
 	cmd.PersistentFlags().IntVarP(&concurrent, "concurrent", "c", runtime.NumCPU(), "The number of domains to scan concurrently")
 	cmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Print debug logs")
