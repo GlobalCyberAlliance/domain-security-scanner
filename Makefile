@@ -12,15 +12,17 @@ GO_TEST			 := $(GO) test -v -short
 GO_TIDY			 := $(GO) mod tidy
 TARGETS			 := bin/dss
 
-all: check-dependencies prepare bin $(TARGETS) clean
+all: check-dependencies prepare optimize $(TARGETS) clean
 
-bin:
-	@mkdir -p bin
-	@echo "Building binaries..."
+dev: prepare $(TARGETS)
 
 bin/%: $(shell find . -name "*.go" -type f)
 	@echo "Building $@..."
-	@cd build && $(GO_BUILD) -o ../$@ $(PROJECT)/cmd/$*
+	@if [ "$(MAKECMDGOALS)" != "dev" ]; then \
+        cd build && $(GO_BUILD) -o ../$@ $(PROJECT)/cmd/$*; \
+    else \
+        $(GO_BUILD) -o $@ $(PROJECT)/cmd/$*; \
+    fi
 
 check-dependencies:
 	@echo "Checking dependencies..."
@@ -53,12 +55,14 @@ lint:
 	@echo "Running linter..."
 	@$(GOLINTER) ./...
 
+optimize:
+	@echo "Creating temporary build directory..."
+	@cp -r cmd go.* pkg ./build/
+	@echo "Optimizing struct field alignment..."
+	@cd build && $(GO_OPTIMIZE) ./... > /dev/null 2>&1 || true
+
 prepare:
 	@echo "Cleaning previous builds..."
 	@rm -rf bin build
 	@mkdir -p bin build
 	@$(GO_TIDY)
-	@echo "Creating temporary build directory..."
-	@cp -r cmd go.* pkg ./build/
-	@echo "Optimizing struct field alignment..."
-	@cd build && $(GO_OPTIMIZE) ./... > /dev/null 2>&1 || true

@@ -77,22 +77,22 @@ func (s *Server) GetMail() (map[string]FoundMail, error) {
 		// DKIM
 		headerSection, _ := imap.ParseBodySectionName("RFC822.HEADER")
 		header := msg.GetBody(headerSection)
-		bscanner := bufio.NewScanner(header)
+		headerScanner := bufio.NewScanner(header)
 		var dkimDone, dkimFound bool
 		var dkim string
-		for bscanner.Scan() {
+		for headerScanner.Scan() {
 			if dkimFound {
-				if bscanner.Text() != strings.TrimSpace(bscanner.Text()) {
-					dkim = dkim + bscanner.Text()
+				if headerScanner.Text() != strings.TrimSpace(headerScanner.Text()) {
+					dkim = dkim + headerScanner.Text()
 				} else {
 					dkimDone = true
 					dkimFound = false
 				}
 			}
 			if !dkimDone {
-				if strings.Contains(bscanner.Text(), "DKIM-Signature") {
+				if strings.Contains(headerScanner.Text(), "DKIM-Signature") {
 					dkimFound = true
-					dkim = dkim + strings.Trim(bscanner.Text(), "DKIM-Signature:")
+					dkim = dkim + strings.Trim(headerScanner.Text(), "DKIM-Signature:")
 				}
 			}
 		}

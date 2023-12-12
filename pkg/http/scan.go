@@ -29,6 +29,21 @@ func (s *Server) handleScanDomains(c *gin.Context) {
 			s.respond(c, 400, "you need to supply an array of domains in the body of the request, formatted as json")
 			return
 		}
+
+		// remove duplicate or empty domains
+		var domainMap = make(map[string]struct{})
+		var filteredDomains []string
+
+		for _, domain := range domains.Domains {
+			if _, ok := domainMap[domain]; ok || domain == "" {
+				continue
+			}
+
+			domainMap[domain] = struct{}{}
+			filteredDomains = append(filteredDomains, domain)
+		}
+
+		domains.Domains = filteredDomains
 	default:
 		s.respond(c, 405, "method not allowed")
 		return

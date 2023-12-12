@@ -16,6 +16,7 @@ func Decode(c *gin.Context, object interface{}) error {
 		return errors.New("only application/json is supported")
 	}
 
+	// ignore body content above 1MB
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1048576)
 
 	if err := c.BindJSON(&object); err != nil {

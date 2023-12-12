@@ -1,12 +1,9 @@
 package advisor
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
-
-	"github.com/goccy/go-json"
 )
 
 func TestAdvisor_CheckDMARC(t *testing.T) {
@@ -229,14 +226,4 @@ func TestAdvisor_CheckDMARC(t *testing.T) {
 			t.Errorf("found %v, want %v", advice[0], expectedAdvice[0])
 		}
 	})
-}
-
-func marshal(data interface{}) (output []byte) {
-	output, _ = json.MarshalIndent(data, "", "\t")
-
-	return output
-}
-
-func printToConsole(data interface{}) {
-	fmt.Println(string(marshal(data)))
 }

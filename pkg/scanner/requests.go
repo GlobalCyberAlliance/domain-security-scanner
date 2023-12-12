@@ -31,7 +31,7 @@ func (s *Scanner) getDNSAnswers(domain string, recordType uint16) ([]dns.RR, err
 		return nil, err
 	}
 
-	if in.MsgHdr.Truncated && s.dnsBuffer <= 4096 {
+	if in.MsgHdr.Truncated && s.dnsBuffer < 4096 {
 		fmt.Printf("DNS buffer %v was too small for %v, retrying with larger buffer (4096)\n", s.dnsBuffer, domain)
 
 		req.SetEdns0(4096, true)

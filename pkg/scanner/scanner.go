@@ -256,7 +256,8 @@ func (s *Scanner) Scan(domain string) *ScanResult {
 	}
 
 	// check that the domain name is valid
-	if _, err := net.LookupHost(domain); err != nil {
+	recs, err := s.getDNSAnswers(domain, dns.TypeNS)
+	if err != nil || len(recs) == 0 {
 		return &ScanResult{
 			Domain: domain,
 			Error:  "invalid domain name",
@@ -266,7 +267,7 @@ func (s *Scanner) Scan(domain string) *ScanResult {
 	res := &ScanResult{Domain: domain}
 	start := time.Now()
 
-	if err := s.GetDNSRecords(res, "BIMI", "DKIM", "DMARC", "MX", "NS", "SPF"); err != nil {
+	if err = s.GetDNSRecords(res, "BIMI", "DKIM", "DMARC", "MX", "NS", "SPF"); err != nil {
 		res.Error = err.Error()
 	}
 
