@@ -25,20 +25,26 @@ var (
 	DKIMPrefix  = DefaultDKIMPrefix
 	DMARCPrefix = DefaultDMARCPrefix
 	SPFPrefix   = DefaultSPFPrefix
+
+	// knownDkimSelectors is a list of known DKIM selectors.
+	knownDkimSelectors = []string{
+		"x",             // Generic
+		"google",        // Google
+		"selector1",     // Microsoft
+		"selector2",     // Microsoft
+		"k1",            // MailChimp
+		"mandrill",      // Mandrill
+		"everlytickey1", // Everlytic
+		"everlytickey2", // Everlytic
+		"dkim",          // Hetzner
+		"mxvault",       // MxVault
+	}
 )
 
 type (
 	// Scanner is a type that queries the DNS records for domain names, looking
 	// for specific resource records.
 	Scanner struct {
-		// DKIMSelectors is used to specify where a DKIM record is hosted for
-		// a specific domain.
-		DKIMSelectors []string
-
-		// Nameservers is a slice of "host:port" strings of nameservers to
-		// issue queries against.
-		Nameservers []string
-
 		// cache is a simple in-memory cache to reduce external requests from
 		// the scanner.
 		cache *cache.Cache
@@ -47,6 +53,10 @@ type (
 		// cache or not.
 		cacheEnabled bool
 
+		// dkimSelectors is used to specify where a DKIM record is hosted for
+		// a specific domain.
+		dkimSelectors []string
+
 		// DNS client shared by all goroutines the scanner spawns.
 		dnsClient *dns.Client
 
@@ -54,11 +64,15 @@ type (
 		// DNS responses
 		dnsBuffer uint16
 
-		// The index of the last-used nameserver, from the Nameservers slice.
+		// The index of the last-used nameserver, from the nameservers slice.
 		//
 		// This field is managed by atomic operations, and should only ever
-		// be referenced by the (*Scanner).GetNS() method.
+		// be referenced by the (*Scanner).getNS() method.
 		lastNameserverIndex uint32
+
+		// nameservers is a slice of "host:port" strings of nameservers to
+		// issue queries against.
+		nameservers []string
 
 		// A channel to use as a semaphore for limiting the number of DNS
 		// queries that can be made concurrently.
@@ -89,8 +103,9 @@ type (
 // New initializes and returns a new *Scanner.
 func New(options ...ScannerOption) (*Scanner, error) {
 	s := &Scanner{
-		dnsClient: new(dns.Client),
-		dnsBuffer: 1024,
+		dnsClient:   new(dns.Client),
+		dnsBuffer:   1024,
+		nameservers: []string{"8.8.8.8:53", "8.8.4.4:53", "1.1.1.1:53"},
 	}
 
 	for _, option := range options {
@@ -110,12 +125,29 @@ func New(options ...ScannerOption) (*Scanner, error) {
 	return s, nil
 }
 
-// ConcurrentScans sets the number of domains that will be scanned
+// OverwriteOption allows the caller to overwrite an existing option.
+func (s *Scanner) OverwriteOption(option ScannerOption) error {
+	return option(s)
+}
+
+// WithCache enables domain caching for the scanner. This is a simple
+// implementation, intended to mitigate abuse attempts.
+func WithCache(enable bool) ScannerOption {
+	return func(s *Scanner) error {
+		if enable {
+			s.cache = cache.New(1*time.Minute, 5*time.Minute)
+			s.cacheEnabled = true
+		}
+		return nil
+	}
+}
+
+// WithConcurrentScans sets the number of domains that will be scanned
 // concurrently.
 //
 // If n <= 0, then this option will default to the return value of
 // runtime.NumCPU().
-func ConcurrentScans(n int) ScannerOption {
+func WithConcurrentScans(n int) ScannerOption {
 	return func(s *Scanner) error {
 		if n <= 0 {
 			n = runtime.NumCPU()
@@ -131,22 +163,31 @@ func ConcurrentScans(n int) ScannerOption {
 	}
 }
 
-// UseCache enables domain caching for the scanner. This is a simple
-// implementation, intended to mitigate abuse attempts.
-func UseCache(enable bool) ScannerOption {
+// WithDKIMSelectors allows the caller to specify which DKIM selectors to
+// scan for (falling back to the default selectors if none are provided).
+func WithDKIMSelectors(selectors ...string) ScannerOption {
 	return func(s *Scanner) error {
-		if enable {
-			s.cache = cache.New(1*time.Minute, 5*time.Minute)
-			s.cacheEnabled = true
-		}
+		s.dkimSelectors = selectors
 		return nil
 	}
 }
 
-// UseNameservers allows the caller to provide a custom set of nameservers for
+// WithDNSBuffer increases the allocated buffer for DNS responses
+func WithDNSBuffer(bufferSize uint16) ScannerOption {
+	return func(s *Scanner) error {
+		if bufferSize > 4096 {
+			return errors.New("buffer size should not be larger than 4096")
+		}
+
+		s.dnsBuffer = bufferSize
+		return nil
+	}
+}
+
+// WithNameservers allows the caller to provide a custom set of nameservers for
 // a *Scanner to use. If ns is nil, or zero-length, the *Scanner will use
 // the nameservers specified in /etc/resolv.conf.
-func UseNameservers(ns []string) ScannerOption {
+func WithNameservers(ns []string) ScannerOption {
 	return func(s *Scanner) error {
 		// If the provided slice of nameservers is nil, or has zero
 		// elements, load up /etc/resolv.conf, and get the "nameserver"
@@ -180,20 +221,8 @@ func UseNameservers(ns []string) ScannerOption {
 			}
 		}
 
-		s.Nameservers = ns[:]
+		s.nameservers = ns[:]
 
-		return nil
-	}
-}
-
-// WithDNSBuffer increases the allocated buffer for DNS responses
-func WithDNSBuffer(bufferSize uint16) ScannerOption {
-	return func(s *Scanner) error {
-		if bufferSize > 4096 {
-			return errors.New("buffer size should not be larger than 4096")
-		}
-
-		s.dnsBuffer = bufferSize
 		return nil
 	}
 }
@@ -221,8 +250,8 @@ func (s *Scanner) start(src Source, ch chan *ScanResult) {
 	for domain := range src.Read() {
 		<-s.sem
 		wg.Add(1)
-		go func(dname string) {
-			ch <- s.Scan(dname)
+		go func(domain string) {
+			ch <- s.Scan(domain)
 			s.sem <- struct{}{}
 			wg.Done()
 		}(domain)
@@ -241,30 +270,30 @@ func (s *Scanner) Scan(domain string) *ScanResult {
 	}
 
 	// check that the domain name is valid
-	recs, err := s.getDNSAnswers(domain, dns.TypeNS)
-	if err != nil || len(recs) == 0 {
+	records, err := s.getDNSAnswers(domain, dns.TypeNS)
+	if err != nil || len(records) == 0 {
 		return &ScanResult{
 			Domain: domain,
 			Error:  "invalid domain name",
 		}
 	}
 
-	res := &ScanResult{Domain: domain}
+	result := &ScanResult{Domain: domain}
 	start := time.Now()
 
-	if err = s.GetDNSRecords(res, "BIMI", "DKIM", "DMARC", "MX", "NS", "SPF"); err != nil {
-		res.Error = err.Error()
+	if err = s.GetDNSRecords(result, "BIMI", "DKIM", "DMARC", "MX", "NS", "SPF"); err != nil {
+		result.Error = err.Error()
 	}
 
-	res.Elapsed = time.Since(start).Milliseconds()
+	result.Elapsed = time.Since(start).Milliseconds()
 
 	if s.cacheEnabled {
-		s.cache.Set(domain, res, 1*time.Minute)
+		s.cache.Set(domain, result, 1*time.Minute)
 	}
 
-	return res
+	return result
 }
 
-func (s *Scanner) GetNS() string {
-	return s.Nameservers[int(atomic.AddUint32(&s.lastNameserverIndex, 1))%len(s.Nameservers)]
+func (s *Scanner) getNS() string {
+	return s.nameservers[int(atomic.AddUint32(&s.lastNameserverIndex, 1))%len(s.nameservers)]
 }

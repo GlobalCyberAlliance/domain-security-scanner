@@ -8,25 +8,55 @@ import (
 	"github.com/pkg/errors"
 )
 
-var knownDkimSelectors = []string{
-	"x",             // Generic
-	"google",        // Google
-	"selector1",     // Microsoft
-	"selector2",     // Microsoft
-	"k1",            // MailChimp
-	"mandrill",      // Mandrill
-	"everlytickey1", // Everlytic
-	"everlytickey2", // Everlytic
-	"dkim",          // Hetzner
-	"mxvault",       // MxVault
+// getDNSRecords queries the DNS server for records of a specific type for a domain.
+// It returns a slice of strings (the records) and an error if any occurred.
+func (s *Scanner) getDNSRecords(domain string, recordType uint16) (records []string, err error) {
+	answers, err := s.getDNSAnswers(domain, recordType)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, answer := range answers {
+		if answer.Header().Rrtype == dns.TypeCNAME {
+			if t, ok := answer.(*dns.CNAME); ok {
+				recursiveLookupTxt, err := s.getDNSRecords(t.Target, recordType)
+				if err != nil {
+					return nil, fmt.Errorf("failed to recursively lookup txt record for %v: %w", t.Target, err)
+				}
+
+				records = append(records, recursiveLookupTxt...)
+
+				continue
+			}
+
+			answer.Header().Rrtype = recordType
+		}
+
+		switch t := answer.(type) {
+		case *dns.A:
+			records = append(records, t.A.String())
+		case *dns.AAAA:
+			records = append(records, t.AAAA.String())
+		case *dns.MX:
+			records = append(records, t.Mx)
+		case *dns.NS:
+			records = append(records, t.Ns)
+		case *dns.TXT:
+			records = append(records, t.Txt...)
+		}
+	}
+
+	return records, nil
 }
 
+// getDNSAnswers queries the DNS server for answers to a specific question.
+// It returns a slice of dns.RR (DNS resource records) and an error if any occurred.
 func (s *Scanner) getDNSAnswers(domain string, recordType uint16) ([]dns.RR, error) {
-	req := new(dns.Msg)
+	req := &dns.Msg{}
 	req.SetQuestion(dns.Fqdn(domain), recordType)
 	req.SetEdns0(s.dnsBuffer, true) // increases the response buffer size
 
-	in, _, err := s.dnsClient.Exchange(req, s.GetNS())
+	in, _, err := s.dnsClient.Exchange(req, s.getNS())
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +66,7 @@ func (s *Scanner) getDNSAnswers(domain string, recordType uint16) ([]dns.RR, err
 
 		req.SetEdns0(4096, true)
 
-		in, _, err = s.dnsClient.Exchange(req, s.GetNS())
+		in, _, err = s.dnsClient.Exchange(req, s.getNS())
 		if err != nil {
 			return nil, err
 		}
@@ -46,30 +76,35 @@ func (s *Scanner) getDNSAnswers(domain string, recordType uint16) ([]dns.RR, err
 }
 
 // GetDNSRecords is a convenience wrapper which will scan all provided DNS record types
-// and fill the pointered ScanResult
+// and fill the pointered ScanResult. It returns an error if any occurred.
 func (s *Scanner) GetDNSRecords(scanResult *ScanResult, recordTypes ...string) (err error) {
+	var records []string
+
 	for _, recordType := range recordTypes {
 		switch strings.ToUpper(recordType) {
 		case "A":
-			scanResult.A, err = s.getTypeA(scanResult.Domain)
+			scanResult.A, err = s.getDNSRecords(scanResult.Domain, dns.TypeA)
 		case "AAAA":
-			scanResult.AAAA, err = s.getTypeAAAA(scanResult.Domain)
+			scanResult.AAAA, err = s.getDNSRecords(scanResult.Domain, dns.TypeAAAA)
 		case "BIMI":
 			scanResult.BIMI, err = s.getTypeBIMI(scanResult.Domain)
 		case "CNAME":
-			scanResult.CNAME, err = s.getTypeCNAME(scanResult.Domain)
+			records, err = s.getDNSRecords(scanResult.Domain, dns.TypeCNAME)
+			if err == nil {
+				scanResult.CNAME = records[0]
+			}
 		case "DKIM":
 			scanResult.DKIM, err = s.getTypeDKIM(scanResult.Domain)
 		case "DMARC":
 			scanResult.DMARC, err = s.getTypeDMARC(scanResult.Domain)
 		case "MX":
-			scanResult.MX, err = s.getTypeMX(scanResult.Domain)
+			scanResult.MX, err = s.getDNSRecords(scanResult.Domain, dns.TypeMX)
 		case "NS":
-			scanResult.NS, err = s.getTypeNS(scanResult.Domain)
+			scanResult.NS, err = s.getDNSRecords(scanResult.Domain, dns.TypeNS)
 		case "SPF":
 			scanResult.SPF, err = s.getTypeSPF(scanResult.Domain)
 		case "TXT":
-			scanResult.TXT, err = s.getTypeTXT(scanResult.Domain)
+			scanResult.TXT, err = s.getDNSRecords(scanResult.Domain, dns.TypeTXT)
 		default:
 			return errors.New("invalid dns record type")
 		}
@@ -82,50 +117,20 @@ func (s *Scanner) GetDNSRecords(scanResult *ScanResult, recordTypes ...string) (
 	return nil
 }
 
-func (s *Scanner) getTypeA(domain string) (records []string, err error) {
-	answers, err := s.getDNSAnswers(domain, dns.TypeA)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, answer := range answers {
-		if t, ok := answer.(*dns.A); ok {
-			records = append(records, t.A.String())
-		}
-	}
-
-	return records, nil
-}
-
-func (s *Scanner) getTypeAAAA(domain string) (records []string, err error) {
-	answers, err := s.getDNSAnswers(domain, dns.TypeAAAA)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, answer := range answers {
-		if t, ok := answer.(*dns.AAAA); ok {
-			records = append(records, t.AAAA.String())
-		}
-	}
-
-	return records, nil
-}
-
 func (s *Scanner) getTypeBIMI(domain string) (string, error) {
 	for _, dname := range []string{
 		"default._bimi." + domain,
 		domain,
 	} {
-		txtRecords, err := s.getTypeTXT(dname)
+		records, err := s.getDNSRecords(dname, dns.TypeTXT)
 		if err != nil {
 			return "", nil
 		}
 
-		for index, txt := range txtRecords {
-			if strings.HasPrefix(txt, BIMIPrefix) {
+		for index, record := range records {
+			if strings.HasPrefix(record, BIMIPrefix) {
 				// TXT records can be split across multiple strings, so we need to join them
-				return strings.Join(txtRecords[index:], ""), nil
+				return strings.Join(records[index:], ""), nil
 			}
 		}
 	}
@@ -133,34 +138,21 @@ func (s *Scanner) getTypeBIMI(domain string) (string, error) {
 	return "", nil
 }
 
-func (s *Scanner) getTypeCNAME(domain string) (string, error) {
-	answers, err := s.getDNSAnswers(domain, dns.TypeCNAME)
-	if err != nil {
-		return "", err
-	}
-
-	for _, answer := range answers {
-		if t, ok := answer.(*dns.CNAME); ok {
-			return t.String(), err
-		}
-	}
-
-	return "", nil
-}
-
+// getTypeDKIM queries the DNS server for DKIM records of a domain.
+// It returns a string (DKIM record) and an error if any occurred.
 func (s *Scanner) getTypeDKIM(domain string) (string, error) {
-	selectors := append(s.DKIMSelectors, knownDkimSelectors...)
+	selectors := append(s.dkimSelectors, knownDkimSelectors...)
 
 	for _, selector := range selectors {
-		txtRecords, err := s.getTypeTXT(selector + "._domainkey." + domain)
+		records, err := s.getDNSRecords(selector+"._domainkey."+domain, dns.TypeTXT)
 		if err != nil {
 			return "", nil
 		}
 
-		for index, txt := range txtRecords {
-			if strings.HasPrefix(txt, DKIMPrefix) {
+		for index, record := range records {
+			if strings.HasPrefix(record, DKIMPrefix) {
 				// TXT records can be split across multiple strings, so we need to join them
-				return strings.Join(txtRecords[index:], ""), nil
+				return strings.Join(records[index:], ""), nil
 			}
 		}
 	}
@@ -168,20 +160,22 @@ func (s *Scanner) getTypeDKIM(domain string) (string, error) {
 	return "", nil
 }
 
+// getTypeDMARC queries the DNS server for DMARC records of a domain.
+// It returns a string (DMARC record) and an error if any occurred.
 func (s *Scanner) getTypeDMARC(domain string) (string, error) {
 	for _, dname := range []string{
 		"_dmarc." + domain,
 		domain,
 	} {
-		txtRecords, err := s.getTypeTXT(dname)
+		records, err := s.getDNSRecords(dname, dns.TypeTXT)
 		if err != nil {
 			return "", nil
 		}
 
-		for index, txt := range txtRecords {
-			if strings.HasPrefix(txt, DMARCPrefix) {
+		for index, record := range records {
+			if strings.HasPrefix(record, DMARCPrefix) {
 				// TXT records can be split across multiple strings, so we need to join them
-				return strings.Join(txtRecords[index:], ""), nil
+				return strings.Join(records[index:], ""), nil
 			}
 		}
 	}
@@ -189,49 +183,21 @@ func (s *Scanner) getTypeDMARC(domain string) (string, error) {
 	return "", nil
 }
 
-func (s *Scanner) getTypeMX(domain string) (records []string, err error) {
-	answers, err := s.getDNSAnswers(domain, dns.TypeMX)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, answer := range answers {
-		if t, ok := answer.(*dns.MX); ok {
-			records = append(records, t.Mx)
-		}
-	}
-
-	return records, nil
-}
-
-func (s *Scanner) getTypeNS(domain string) (records []string, err error) {
-	answers, err := s.getDNSAnswers(domain, dns.TypeNS)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, answer := range answers {
-		if t, ok := answer.(*dns.NS); ok {
-			records = append(records, t.Ns)
-		}
-	}
-
-	return records, nil
-}
-
+// getTypeSPF queries the DNS server for SPF records of a domain.
+// It returns a string (SPF record) and an error if any occurred.
 func (s *Scanner) getTypeSPF(domain string) (string, error) {
-	txtRecords, err := s.getTypeTXT(domain)
+	records, err := s.getDNSRecords(domain, dns.TypeTXT)
 	if err != nil {
 		return "", err
 	}
 
-	for _, txt := range txtRecords {
-		if strings.HasPrefix(txt, SPFPrefix) {
-			if !strings.Contains(txt, "redirect=") {
-				return txt, nil
+	for _, record := range records {
+		if strings.HasPrefix(record, SPFPrefix) {
+			if !strings.Contains(record, "redirect=") {
+				return record, nil
 			}
 
-			parts := strings.Fields(txt)
+			parts := strings.Fields(record)
 			for _, part := range parts {
 				if strings.Contains(part, "redirect=") {
 					redirectDomain := strings.TrimPrefix(part, "redirect=")
@@ -242,34 +208,4 @@ func (s *Scanner) getTypeSPF(domain string) (string, error) {
 	}
 
 	return "", nil
-}
-
-func (s *Scanner) getTypeTXT(domain string) (records []string, err error) {
-	answers, err := s.getDNSAnswers(domain, dns.TypeTXT)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, answer := range answers {
-		// handle recursive lookups
-		if answer.Header().Rrtype == dns.TypeCNAME {
-			if t, ok := answer.(*dns.CNAME); ok {
-				recursiveLookupTxt, err := s.getTypeTXT(t.Target)
-				if err != nil {
-					return nil, fmt.Errorf("failed to recursively lookup txt record for %v: %w", t.Target, err)
-				}
-
-				records = append(records, recursiveLookupTxt...)
-
-				continue
-			}
-		}
-
-		answer.Header().Rrtype = dns.TypeTXT
-		if t, ok := answer.(*dns.TXT); ok {
-			records = append(records, t.Txt...)
-		}
-	}
-
-	return records, nil
 }

@@ -22,33 +22,32 @@ var cmdScan = &cobra.Command{
 	Long:    "Scan DNS records for one or multiple domains.\nBy default, the command will listen on STDIN, allowing you to type or pipe multiple domains.",
 	Run: func(command *cobra.Command, args []string) {
 		opts := []scanner.ScannerOption{
-			scanner.ConcurrentScans(concurrent),
-			scanner.UseCache(cacheEnabled),
-			scanner.UseNameservers(nameservers),
+			scanner.WithCache(cacheEnabled),
+			scanner.WithConcurrentScans(concurrent),
+			scanner.WithDKIMSelectors(dkimSelector...),
 			scanner.WithDNSBuffer(dnsBuffer),
+			scanner.WithNameservers(nameservers),
 			scanner.WithTimeout(time.Duration(timeout) * time.Second),
 		}
 
 		var source scanner.Source
 
 		if len(args) == 0 && zoneFile {
-			source = scanner.ZonefileSource(os.Stdin)
+			source = scanner.NewSource(os.Stdin, scanner.ZonefileSourceType)
 		} else if len(args) > 0 && zoneFile {
 			log.Fatal().Msg("-z flag provided, but not reading from STDIN")
 		} else if len(args) == 0 {
 			log.Info().Msg("Accepting input from STDIN. Type a domain and hit enter.")
-			source = scanner.TextSource(os.Stdin)
+			source = scanner.NewSource(os.Stdin, scanner.TextSourceType)
 		} else {
-			sr := strings.NewReader(strings.Join(args, "\n"))
-			source = scanner.TextSource(sr)
+			reader := strings.NewReader(strings.Join(args, "\n"))
+			source = scanner.NewSource(reader, scanner.TextSourceType)
 		}
 
 		sc, err := scanner.New(opts...)
 		if err != nil {
 			log.Fatal().Err(err).Msg("An unexpected error occurred.")
 		}
-
-		sc.DKIMSelectors = dkimSelector
 
 		domainAdvisor := advisor.NewAdvisor(time.Duration(timeout)*time.Second, cacheEnabled)
 

@@ -50,10 +50,11 @@ var (
 			server := http.NewServer(log)
 
 			opts := []scanner.ScannerOption{
-				scanner.ConcurrentScans(concurrent),
-				scanner.UseCache(cacheEnabled),
-				scanner.UseNameservers(nameservers),
+				scanner.WithCache(cacheEnabled),
+				scanner.WithConcurrentScans(concurrent),
+				scanner.WithDKIMSelectors(dkimSelector...),
 				scanner.WithDNSBuffer(dnsBuffer),
+				scanner.WithNameservers(nameservers),
 				scanner.WithTimeout(time.Duration(timeout) * time.Second),
 			}
 
@@ -75,10 +76,11 @@ var (
 		Short: "Serve DNS security queries via a dedicated email account",
 		Run: func(command *cobra.Command, args []string) {
 			opts := []scanner.ScannerOption{
-				scanner.ConcurrentScans(concurrent),
-				scanner.UseCache(cacheEnabled),
-				scanner.UseNameservers(nameservers),
+				scanner.WithCache(cacheEnabled),
+				scanner.WithConcurrentScans(concurrent),
+				scanner.WithDKIMSelectors(dkimSelector...),
 				scanner.WithDNSBuffer(dnsBuffer),
+				scanner.WithNameservers(nameservers),
 				scanner.WithTimeout(time.Duration(timeout) * time.Second),
 			}
 

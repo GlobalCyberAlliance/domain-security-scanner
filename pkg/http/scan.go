@@ -62,10 +62,17 @@ func (s *Server) handleScanDomains(c *gin.Context) {
 	}
 
 	domainList := strings.NewReader(strings.Join(domains.Domains, "\n"))
-	source := scanner.TextSource(domainList)
+	source := scanner.NewSource(domainList, scanner.TextSourceType)
 
+	// TODO: temporary solution to allow for custom DKIM selectors in the API.
+	// This implementation is not ideal, as it will overwrite the selectors for
+	// future scans.
 	if queryParam, ok := c.GetQuery("dkimSelector"); ok {
-		s.Scanner.DKIMSelectors = strings.Split(queryParam, ",")
+		if err := s.Scanner.OverwriteOption(scanner.WithDKIMSelectors(strings.Split(queryParam, ",")...)); err != nil {
+			s.logger.Error().Err(err).Msg("fai")
+			s.respond(c, 400, err.Error())
+			return
+		}
 	}
 
 	var resultsWithAdvice []model.ScanResultWithAdvice

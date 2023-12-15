@@ -77,7 +77,7 @@ func (s *Server) handler() error {
 			}
 
 			sourceDomainList := strings.NewReader(strings.Join(domainList, "\n"))
-			source := scanner.TextSource(sourceDomainList)
+			source := scanner.NewSource(sourceDomainList, scanner.TextSourceType)
 
 			for result := range s.Scanner.Start(source) {
 				sender := addresses[result.Domain].Address
