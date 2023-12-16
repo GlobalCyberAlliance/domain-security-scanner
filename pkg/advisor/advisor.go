@@ -144,9 +144,12 @@ func (a *Advisor) CheckBIMI(bimi string) (advice []string) {
 		advice = append(advice, "Your BIMI record appears to be malformed as no semicolons seem to be present.")
 	}
 
-	if len(bimi) == 0 {
-		return []string{"Your BIMI record looks good! There's nothing more to do."}
+	if len(advice) == 0 {
+		return []string{"Your BIMI record looks good! No further action needed."}
 	}
+
+	// prepend a message detailing that the BIMI record has some issues
+	advice = append([]string{"Your BIMI record has some issues:"}, advice...)
 
 	return advice
 }
