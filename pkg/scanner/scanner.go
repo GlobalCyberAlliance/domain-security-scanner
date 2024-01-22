@@ -272,9 +272,13 @@ func (s *Scanner) Scan(domain string) *ScanResult {
 	// check that the domain name is valid
 	records, err := s.getDNSAnswers(domain, dns.TypeNS)
 	if err != nil || len(records) == 0 {
-		return &ScanResult{
-			Domain: domain,
-			Error:  "invalid domain name",
+		// check if TXT records exist, as the nameserver check won't work for subdomains
+		records, err = s.getDNSAnswers(domain, dns.TypeTXT)
+		if err != nil || len(records) == 0 {
+			return &ScanResult{
+				Domain: domain,
+				Error:  "invalid domain name",
+			}
 		}
 	}
 

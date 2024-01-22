@@ -60,7 +60,7 @@ var cmdScan = &cobra.Command{
 				ScanResult: result,
 			}
 
-			if advise {
+			if result.Error == "" && advise {
 				resultWithAdvice.Advice = domainAdvisor.CheckAll(result.BIMI, result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF, checkTls)
 			}
 
