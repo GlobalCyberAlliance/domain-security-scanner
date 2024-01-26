@@ -45,37 +45,31 @@ type (
 	// Scanner is a type that queries the DNS records for domain names, looking
 	// for specific resource records.
 	Scanner struct {
-		// cache is a simple in-memory cache to reduce external requests from
-		// the scanner.
+		// cache is a simple in-memory cache to reduce external requests from he scanner.
 		cache *cache.Cache
 
-		// cacheEnabled specifies whether the scanner should utilize the in-memory
-		// cache or not.
+		// cacheEnabled specifies whether the scanner should utilize the in-memory cache or not.
 		cacheEnabled bool
 
-		// dkimSelectors is used to specify where a DKIM record is hosted for
-		// a specific domain.
+		// dkimSelectors is used to specify where a DKIM record is hosted for a specific domain.
 		dkimSelectors []string
 
 		// DNS client shared by all goroutines the scanner spawns.
 		dnsClient *dns.Client
 
-		// dnsBuffer is used to configure the size of the buffer allocated for
-		// DNS responses
+		// dnsBuffer is used to configure the size of the buffer allocated for DNS responses.
 		dnsBuffer uint16
 
 		// The index of the last-used nameserver, from the nameservers slice.
 		//
-		// This field is managed by atomic operations, and should only ever
-		// be referenced by the (*Scanner).getNS() method.
+		// This field is managed by atomic operations, and should only ever be referenced by the (*Scanner).getNS()
+		// method.
 		lastNameserverIndex uint32
 
-		// nameservers is a slice of "host:port" strings of nameservers to
-		// issue queries against.
+		// nameservers is a slice of "host:port" strings of nameservers to issue queries against.
 		nameservers []string
 
-		// A channel to use as a semaphore for limiting the number of DNS
-		// queries that can be made concurrently.
+		// A channel to use as a semaphore for limiting the number of DNS queries that can be made concurrently.
 		sem chan struct{}
 	}
 
@@ -100,28 +94,35 @@ type (
 	}
 )
 
-// New initializes and returns a new *Scanner.
+// New is a function that initializes and returns a new instance of the Scanner struct.
+// It accepts a variadic number of ScannerOption functions that can be used to configure the Scanner instance.
 func New(options ...ScannerOption) (*Scanner, error) {
+	// Create a new Scanner instance with some default values
 	s := &Scanner{
-		dnsClient:   new(dns.Client),
-		dnsBuffer:   1024,
-		nameservers: []string{"8.8.8.8:53", "8.8.4.4:53", "1.1.1.1:53"},
+		dnsClient:   new(dns.Client),                                    // Initialize a new dns.Client
+		dnsBuffer:   1024,                                               // Set the dnsBuffer size to 1024 bytes
+		nameservers: []string{"8.8.8.8:53", "8.8.4.4:53", "1.1.1.1:53"}, // Set the default nameservers to Google and Cloudflare
 	}
 
+	// Apply each of the provided options to the Scanner instance.
+	// If any of the options return an error, wrap the error with additional context and return it immediately.
 	for _, option := range options {
 		if err := option(s); err != nil {
 			return nil, errors.Wrap(err, "apply option")
 		}
 	}
 
+	// If no semaphore channel (s.sem) has been set by the options, create a new one with a capacity equal to the number of CPU cores available
 	if s.sem == nil {
 		s.sem = make(chan struct{}, runtime.NumCPU())
 	}
 
+	// Fill the semaphore channel with empty struct{} instances
 	for i := 0; i < cap(s.sem); i++ {
 		s.sem <- struct{}{}
 	}
 
+	// Return the configured Scanner instance
 	return s, nil
 }
 
@@ -262,11 +263,15 @@ func (s *Scanner) start(src Source, ch chan *ScanResult) {
 
 // Scan allows the caller to use the *Scanner's underlying data structures
 // for performing a one-off scan of the given domain name.
-func (s *Scanner) Scan(domain string) *ScanResult {
+func (s *Scanner) Scan(domain string) (result *ScanResult) {
 	if s.cacheEnabled {
 		if scanResult, ok := s.cache.Get(domain); ok {
 			return scanResult.(*ScanResult)
 		}
+
+		defer func() {
+			s.cache.Set(domain, result, 3*time.Minute)
+		}()
 	}
 
 	// check that the domain name is valid
@@ -275,14 +280,17 @@ func (s *Scanner) Scan(domain string) *ScanResult {
 		// check if TXT records exist, as the nameserver check won't work for subdomains
 		records, err = s.getDNSAnswers(domain, dns.TypeTXT)
 		if err != nil || len(records) == 0 {
-			return &ScanResult{
+			// fill variable to satisfy deferred cache fill
+			result = &ScanResult{
 				Domain: domain,
 				Error:  "invalid domain name",
 			}
+
+			return result
 		}
 	}
 
-	result := &ScanResult{Domain: domain}
+	result = &ScanResult{Domain: domain}
 	start := time.Now()
 
 	if err = s.GetDNSRecords(result, "BIMI", "DKIM", "DMARC", "MX", "NS", "SPF"); err != nil {
@@ -290,10 +298,6 @@ func (s *Scanner) Scan(domain string) *ScanResult {
 	}
 
 	result.Elapsed = time.Since(start).Milliseconds()
-
-	if s.cacheEnabled {
-		s.cache.Set(domain, result, 1*time.Minute)
-	}
 
 	return result
 }

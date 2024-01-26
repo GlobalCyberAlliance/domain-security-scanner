@@ -415,6 +415,10 @@ func (a *Advisor) checkHostTls(hostname string, port int) (advice []string) {
 		if tlsAdvice, ok := a.tlsCacheHost.Get(hostname); ok {
 			return tlsAdvice.([]string)
 		}
+
+		defer func() {
+			a.tlsCacheHost.Set(hostname, advice, 3*time.Minute)
+		}()
 	}
 
 	if port == 0 {
@@ -424,7 +428,9 @@ func (a *Advisor) checkHostTls(hostname string, port int) (advice []string) {
 	conn, err := tls.DialWithDialer(a.dialer, "tcp", hostname+":"+cast.ToString(port), nil)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such host") {
-			return []string{hostname + " could not be reached"}
+			// fill variable to satisfy deferred cache fill
+			advice = []string{hostname + " could not be reached"}
+			return advice
 		}
 
 		if strings.Contains(err.Error(), "certificate is not trusted") || strings.Contains(err.Error(), "failed to verify certificate") {
@@ -442,10 +448,6 @@ func (a *Advisor) checkHostTls(hostname string, port int) (advice []string) {
 
 	advice = append(advice, checkTlsVersion(conn.ConnectionState().Version))
 
-	if a.tlsCacheEnabled {
-		a.tlsCacheHost.Set(hostname, advice, 1*time.Minute)
-	}
-
 	return advice
 }
 
@@ -459,21 +461,30 @@ func (a *Advisor) checkMailTls(hostname string) (advice []string) {
 		if tlsAdvice, ok := a.tlsCacheMail.Get(hostname); ok {
 			return tlsAdvice.([]string)
 		}
+
+		defer func() {
+			a.tlsCacheMail.Set(hostname, advice, 3*time.Minute)
+		}()
 	}
 
 	conn, err := a.dialer.Dial("tcp", hostname+":25")
 	if err != nil {
+		// fill variable to satisfy deferred cache fill
 		if strings.Contains(err.Error(), "i/o timeout") {
-			return []string{"Failed to reach domain before timeout"}
+			advice = []string{"Failed to reach domain before timeout"}
+		} else {
+			advice = []string{"Failed to reach domain"}
 		}
 
-		return []string{"Failed to reach domain"}
+		return advice
 	}
 	defer conn.Close()
 
 	client, err := smtp.NewClient(conn, hostname)
 	if err != nil {
-		return []string{"Failed to reach domain"}
+		// fill variable to satisfy deferred cache fill
+		advice = []string{"Failed to reach domain"}
+		return advice
 	}
 
 	tlsConfig := &tls.Config{
@@ -487,36 +498,42 @@ func (a *Advisor) checkMailTls(hostname string) (advice []string) {
 
 			// close the existing connection and create a new one as we can't reuse it in the same way as the checkHostTls function
 			if err = conn.Close(); err != nil {
-				return append(advice, "Failed to re-attempt connection without certificate verification")
+				// fill variable to satisfy deferred cache fill
+				advice = append(advice, "Failed to re-attempt connection without certificate verification")
+				return advice
 			}
 
 			conn, err = a.dialer.Dial("tcp", hostname+"25")
 			if err != nil {
-				return []string{"Failed to reach domain"}
+				// fill variable to satisfy deferred cache fill
+				advice = []string{"Failed to reach domain"}
+				return advice
 			}
 			defer conn.Close()
 
 			client, err = smtp.NewClient(conn, hostname)
 			if err != nil {
-				return []string{"Failed to reach domain"}
+				// fill variable to satisfy deferred cache fill
+				advice = []string{"Failed to reach domain"}
+				return advice
 			}
 
 			// retry with InsecureSkipVerify
 			tlsConfig.InsecureSkipVerify = true
 			if err = client.StartTLS(tlsConfig); err != nil {
-				return append(advice, "Failed to start TLS connection")
+				// fill variable to satisfy deferred cache fill
+				advice = append(advice, "Failed to start TLS connection")
+				return advice
 			}
 		} else {
-			return []string{"Failed to start TLS connection: " + err.Error()}
+			// fill variable to satisfy deferred cache fill
+			advice = []string{"Failed to start TLS connection: " + err.Error()}
+			return advice
 		}
 	}
 
 	if state, ok := client.TLSConnectionState(); ok {
 		advice = append(advice, checkTlsVersion(state.Version))
-	}
-
-	if a.tlsCacheEnabled {
-		a.tlsCacheMail.Set(hostname, advice, 1*time.Minute)
 	}
 
 	return advice

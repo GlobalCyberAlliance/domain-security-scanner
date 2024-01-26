@@ -60,6 +60,10 @@ var cmdScan = &cobra.Command{
 				ScanResult: result,
 			}
 
+			if result == nil {
+				log.Fatal().Msg("An unexpected error occurred.")
+			}
+
 			if result.Error == "" && advise {
 				resultWithAdvice.Advice = domainAdvisor.CheckAll(result.BIMI, result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF, checkTls)
 			}

@@ -7,7 +7,7 @@ import (
 )
 
 func TestAdvisor_CheckDMARC(t *testing.T) {
-	advisor := NewAdvisor(time.Second)
+	advisor := NewAdvisor(time.Second, false)
 
 	t.Run("missing", func(t *testing.T) {
 		expectedAdvice := []string{
