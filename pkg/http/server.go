@@ -10,6 +10,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 	"github.com/go-chi/httprate"
 	"github.com/goccy/go-json"
 	"github.com/rs/zerolog"
@@ -45,6 +46,14 @@ func NewServer(logger zerolog.Logger, version string) *Server {
 	config.OpenAPIPath = "/api/v1/docs"
 
 	mux := chi.NewMux()
+	mux.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST"},
+		AllowedHeaders:   []string{"Accept", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: false,
+		MaxAge:           300, // Maximum value not ignored by any of major browsers
+	}))
 	mux.Use(httprate.Limit(3, 3*time.Second,
 		httprate.WithLimitHandler(func(w http.ResponseWriter, r *http.Request) {
 			response, err := json.Marshal(huma.Error429TooManyRequests("try again later"))

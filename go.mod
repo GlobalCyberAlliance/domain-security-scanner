@@ -6,6 +6,7 @@ require (
 	github.com/danielgtaylor/huma/v2 v2.6.0
 	github.com/emersion/go-imap v1.2.1
 	github.com/go-chi/chi/v5 v5.0.12
+	github.com/go-chi/cors v1.2.1
 	github.com/go-chi/httprate v0.9.0
 	github.com/goccy/go-json v0.10.2
 	github.com/miekg/dns v1.1.58
