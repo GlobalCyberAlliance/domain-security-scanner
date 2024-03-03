@@ -14,16 +14,18 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 )
+
+// support OS-specific path separators
+const slash = string(os.PathSeparator)
 
 var (
 	cmd = &cobra.Command{
 		Use:     "dss",
 		Short:   "Scan a domain's DNS records.",
 		Long:    "Scan a domain's DNS records.\nhttps://github.com/GlobalCyberAlliance/domain-security-scanner",
-		Version: "2.4.8",
+		Version: "3.0.0",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if debug {
 				log = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).With().Timestamp().Logger().Level(zerolog.DebugLevel)
@@ -31,7 +33,16 @@ var (
 				log = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).With().Timestamp().Logger().Level(zerolog.InfoLevel)
 			}
 
-			getConfig()
+			configDir, err := os.UserHomeDir()
+			if err != nil {
+				log.Fatal().Err(err).Msg("unable to retrieve user's home directory")
+			}
+
+			cfg, err = NewConfig(fmt.Sprintf("%s%s.config%sdomain-security-scanner", strings.TrimSuffix(configDir, slash), slash, slash))
+			if err != nil {
+				log.Fatal().Err(err).Msg("unable to initialize config")
+			}
+
 			if len(nameservers) == 0 {
 				nameservers = cfg.Nameservers
 			}
@@ -43,69 +54,33 @@ var (
 			}
 		},
 	}
-	cfg                                             *Config
-	log                                             zerolog.Logger
-	concurrent, writeToFileCounter                  int
-	format, outputFile                              string
-	dkimSelector, nameservers                       []string
-	timeout                                         int64
-	advise, debug, cacheEnabled, checkTls, zoneFile bool
-	dnsBuffer                                       uint16
+
+	cfg                               *Config
+	log                               zerolog.Logger
+	writeToFileCounter                int
+	format, outputFile                string
+	dkimSelector, nameservers         []string
+	advise, debug, checkTLS, zoneFile bool
+	dnsBuffer                         uint16
+	cache, timeout                    time.Duration
+	concurrent                        uint16
 )
 
 func main() {
 	cmd.PersistentFlags().BoolVarP(&advise, "advise", "a", false, "Provide suggestions for incorrect/missing mail security features")
-	cmd.PersistentFlags().BoolVar(&cacheEnabled, "cache", false, "cache scan results for 60 seconds")
-	cmd.PersistentFlags().BoolVar(&checkTls, "checkTls", false, "Check the TLS connectivity and cert validity of domains")
-	cmd.PersistentFlags().IntVarP(&concurrent, "concurrent", "c", runtime.NumCPU(), "The number of domains to scan concurrently")
+	cmd.PersistentFlags().DurationVar(&cache, "cache", 3*time.Minute, "Specify how long to cache results for")
+	cmd.PersistentFlags().BoolVar(&checkTLS, "checkTLS", false, "Check the TLS connectivity and cert validity of domains")
+	cmd.PersistentFlags().Uint16VarP(&concurrent, "concurrent", "c", uint16(runtime.NumCPU()), "The number of domains to scan concurrently")
 	cmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Print debug logs")
 	cmd.PersistentFlags().StringSliceVar(&dkimSelector, "dkimSelector", []string{}, "Specify a DKIM selector")
 	cmd.PersistentFlags().Uint16Var(&dnsBuffer, "dnsBuffer", 1024, "Specify the allocated buffer for DNS responses")
 	cmd.PersistentFlags().StringVarP(&format, "format", "f", "yaml", "Format to print results in (yaml, json)")
 	cmd.PersistentFlags().StringSliceVarP(&nameservers, "nameservers", "n", nil, "Use specific nameservers, in `host[:port]` format; may be specified multiple times")
 	cmd.PersistentFlags().StringVarP(&outputFile, "outputFile", "o", "", "Output the results to a specified file (creates a file with the current unix timestamp if no file is specified)")
-	cmd.PersistentFlags().Int64VarP(&timeout, "timeout", "t", 15, "Timeout duration for a DNS query")
+	cmd.PersistentFlags().DurationVarP(&timeout, "timeout", "t", 15*time.Second, "Timeout duration for queries")
 	cmd.PersistentFlags().BoolVarP(&zoneFile, "zoneFile", "z", false, "Input file/pipe containing an RFC 1035 zone file")
 
 	_ = cmd.Execute()
-}
-
-func getConfig() {
-	configDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatal().Err(err).Msg("unable to retrieve user's home directory")
-	}
-
-	configDir = strings.TrimSuffix(configDir, "/") + "/.config/domain-security-scanner"
-
-	viper.AddConfigPath(configDir)
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.SetDefault("nameservers", "8.8.8.8")
-
-	if err = viper.ReadInConfig(); err != nil {
-		if err = os.MkdirAll(configDir, os.ModePerm); err != nil {
-			log.Fatal().Err(err).Msg("failed to create config directory")
-		}
-
-		if _, err = os.Create(configDir + "/config.yml"); err != nil {
-			log.Fatal().Err(err).Msg("unable to create config")
-		}
-
-		if err = viper.WriteConfig(); err != nil {
-			log.Fatal().Err(err).Msg("No config file could be found, and one could not be created.")
-		}
-
-		if err = viper.ReadInConfig(); err != nil {
-			log.Fatal().Err(err).Msg("No config file could be found.")
-		}
-	} else {
-		_ = viper.WriteConfig() // Write any environmental variables to the config file
-	}
-
-	if err = viper.Unmarshal(&cfg); err != nil {
-		log.Fatal().Err(err).Msg("unable to set config values")
-	}
 }
 
 func marshal(data interface{}) (output []byte) {
@@ -121,7 +96,7 @@ func marshal(data interface{}) (output []byte) {
 		// write to csv in buffer
 		var buffer bytes.Buffer
 		writer := csv.NewWriter(&buffer)
-		_ = writer.Write(scan.Csv())
+		_ = writer.Write(scan.CSV())
 		writer.Flush()
 		output = buffer.Bytes()
 	case "json":
@@ -153,17 +128,17 @@ func printToConsole(data interface{}) {
 		return
 	}
 
-	fmt.Println(string(marshal(data)))
+	fmt.Print(string(marshal(data)))
 }
 
 func printToFile(data interface{}, file string) {
-	outputFile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, os.ModePerm)
+	outputPrintFile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		return
 	}
-	defer outputFile.Close()
+	defer outputPrintFile.Close()
 
-	if _, err = outputFile.Write(marshal(data)); err != nil {
+	if _, err = outputPrintFile.Write(marshal(data)); err != nil {
 		log.Fatal().Err(err).Msg("failed to write output to file")
 	}
 }

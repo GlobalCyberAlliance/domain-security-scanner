@@ -49,17 +49,19 @@ See the [zonefile.example](zonefile.example) file in this repo.
 
 ## Serve REST API
 
-You can also expose the domain scanning functionality via a REST API. By default, this is rate limited to 10 requests per second from a single IP address. Serve the API by running the following:
+You can also expose the domain scanning functionality via a REST API. By default, this is rate limited to 3 requests per 3 second interval from a single IP address. Serve the API by running the following:
 
 `dss serve api --port 80`
+
+You can reach the API docs by visiting `http://server-ip:port/api/v1/docs` and the OpenAPI schema at `http://server-ip:port/api/v1/docs.json` or `http://server-ip:port/api/v1/docs.yaml`. You can also test requests through this interface thanks to [Scalar](https://github.com/scalar/scalar).
 
 You can then get a single domain's results by submitting a GET request like this `http://server-ip:port/api/v1/scan/globalcyberalliance.org`, which will return a JSON response similar to this:
 
 ```json
 {
+  "$schema": "http://server-ip:port/schemas/ScanSingleDomainResponseBody.json",
   "scanResult": {
     "domain": "globalcyberalliance.org",
-    "elapsed": 221,
     "bimi": "v=BIMI1;l=https://bimi.entrust.net/globalcyberalliance.org/logo.svg;a=https://bimi.entrust.net/globalcyberalliance.org/certchain.pem",
     "dkim": "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCrLHiExVd55zd/IQ/J/mRwSRMAocV/hMB3jXwaHH36d9NaVynQFYV8NaWi69c1veUtRzGt7yAioXqLj7Z4TeEUoOLgrKsn8YnckGs9i3B3tVFB+Ch/4mPhXWiNfNdynHWBcPcbJ8kjEQ2U8y78dHZj1YeRXXVvWob2OaKynO8/lQIDAQAB;",
     "dmarc": "v=DMARC1; p=reject; fo=1; rua=mailto:3941b663@inbox.ondmarc.com,mailto:2zw1qguv@ag.dmarcian.com,mailto:dmarc_agg@vali.email; ruf=mailto:2zw1qguv@fr.dmarcian.com,mailto:gca-ny-sc@globalcyberalliance.org;",
@@ -110,79 +112,80 @@ Alternatively, you can scan multiple domains by POSTing them to `http://server-i
 Which will return a JSON response like this:
 
 ```json
-[
-	{
-		"scanResult": {
-			"domain": "globalcyberalliance.org",
-            "elapsed": 846,
-			"bimi": "v=BIMI1;l=https://bimi.entrust.net/globalcyberalliance.org/logo.svg;a=https://bimi.entrust.net/globalcyberalliance.org/certchain.pem",
-            "dkim": "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCrLHiExVd55zd/IQ/J/mRwSRMAocV/hMB3jXwaHH36d9NaVynQFYV8NaWi69c1veUtRzGt7yAioXqLj7Z4TeEUoOLgrKsn8YnckGs9i3B3tVFB+Ch/4mPhXWiNfNdynHWBcPcbJ8kjEQ2U8y78dHZj1YeRXXVvWob2OaKynO8/lQIDAQAB;",
-			"dmarc": "v=DMARC1; p=reject; fo=1; rua=mailto:3941b663@inbox.ondmarc.com,mailto:2zw1qguv@ag.dmarcian.com,mailto:dmarc_agg@vali.email; ruf=mailto:2zw1qguv@fr.dmarcian.com,mailto:gca-ny-sc@globalcyberalliance.org;",
-			"spf": "v=spf1 include:_u.globalcyberalliance.org._spf.smart.ondmarc.com -all",
-			"mx": [
-				"aspmx.l.google.com.",
-				"alt1.aspmx.l.google.com.",
-				"alt2.aspmx.l.google.com.",
-				"alt3.aspmx.l.google.com.",
-				"alt4.aspmx.l.google.com."
-			],
-		},
-		"advice": {
-			"bimi": [
-				"Your SVG logo could not be downloaded.",
-				"Your VMC certificate could not be downloaded."
-			],
-			"dkim": [
-				"DKIM is setup for this email server. However, if you have other 3rd party systems, please send a test email to confirm DKIM is setup properly."
-			],
-			"dmarc": [
-				"You are at the highest level! Please make sure to continue reviewing the reports and make the appropriate adjustments, if needed."
-			],
-			"domain": [
-				"Your domain is using TLS 1.3, no further action needed!"
-			],
-			"mx": [
-				"All of your domains are using TLS 1.3, no further action needed!"
-			],
-			"spf": [
-				"SPF seems to be setup correctly! No further action needed."
-			]
-		}
-	},
-	{
-		"scanResult": {
-			"domain": "gcatoolkit.org",
-            "elapsed": 409,
-			"dmarc": "v=DMARC1; p=reject;",
-            "mx": [
-              "mx01.1and1.com.", 
-              "mx00.1and1.com."
-            ],
-			"spf": "v=spf1 -all",
-		},
-		"advice": {
-			"bimi": [
-				"We couldn't detect any active BIMI record for your domain. Please visit https://dmarcguide.globalcyberalliance.org to fix this."
-			],
-			"dkim": [
-				"We couldn't detect any active DKIM record for your domain. Please visit https://dmarcguide.globalcyberalliance.org to fix this."
-			],
-			"dmarc": [
-				"You are at the highest level! However, we do recommend keeping reports enabled (via the rua tag) in case any issues may arise and you can review reports to see if DMARC is the cause."
-			],
-			"domain": [
-				"Your domain is using TLS 1.3, no further action needed!"
-			],
-			"mx": [
-				"mx01.1and1.com: Failed to reach domain",
-				"mx00.1and1.com: Failed to reach domain"
-			],
-			"spf": [
-				"SPF seems to be setup correctly! No further action needed."
-			]
-		}
-	}
-]
+{
+  "$schema": "http://server-ip:port/schemas/ScanMultipleDomainsResponseBody.json",
+  "results": [
+    {
+      "scanResult": {
+        "domain": "globalcyberalliance.org",
+        "bimi": "v=BIMI1;l=https://bimi.entrust.net/globalcyberalliance.org/logo.svg;a=https://bimi.entrust.net/globalcyberalliance.org/certchain.pem",
+        "dkim": "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCrLHiExVd55zd/IQ/J/mRwSRMAocV/hMB3jXwaHH36d9NaVynQFYV8NaWi69c1veUtRzGt7yAioXqLj7Z4TeEUoOLgrKsn8YnckGs9i3B3tVFB+Ch/4mPhXWiNfNdynHWBcPcbJ8kjEQ2U8y78dHZj1YeRXXVvWob2OaKynO8/lQIDAQAB;",
+        "dmarc": "v=DMARC1; p=reject; fo=1; rua=mailto:3941b663@inbox.ondmarc.com,mailto:2zw1qguv@ag.dmarcian.com,mailto:dmarc_agg@vali.email; ruf=mailto:2zw1qguv@fr.dmarcian.com,mailto:gca-ny-sc@globalcyberalliance.org;",
+        "spf": "v=spf1 include:_u.globalcyberalliance.org._spf.smart.ondmarc.com -all",
+        "mx": [
+          "aspmx.l.google.com.",
+          "alt1.aspmx.l.google.com.",
+          "alt2.aspmx.l.google.com.",
+          "alt3.aspmx.l.google.com.",
+          "alt4.aspmx.l.google.com."
+        ]
+      },
+      "advice": {
+        "bimi": [
+          "Your SVG logo could not be downloaded.",
+          "Your VMC certificate could not be downloaded."
+        ],
+        "dkim": [
+          "DKIM is setup for this email server. However, if you have other 3rd party systems, please send a test email to confirm DKIM is setup properly."
+        ],
+        "dmarc": [
+          "You are at the highest level! Please make sure to continue reviewing the reports and make the appropriate adjustments, if needed."
+        ],
+        "domain": [
+          "Your domain is using TLS 1.3, no further action needed!"
+        ],
+        "mx": [
+          "All of your domains are using TLS 1.3, no further action needed!"
+        ],
+        "spf": [
+          "SPF seems to be setup correctly! No further action needed."
+        ]
+      }
+    },
+    {
+      "scanResult": {
+        "domain": "gcatoolkit.org",
+        "dmarc": "v=DMARC1; p=reject;",
+        "mx": [
+          "mx01.1and1.com.",
+          "mx00.1and1.com."
+        ],
+        "spf": "v=spf1 -all"
+      },
+      "advice": {
+        "bimi": [
+          "We couldn't detect any active BIMI record for your domain. Please visit https://dmarcguide.globalcyberalliance.org to fix this."
+        ],
+        "dkim": [
+          "We couldn't detect any active DKIM record for your domain. Please visit https://dmarcguide.globalcyberalliance.org to fix this."
+        ],
+        "dmarc": [
+          "You are at the highest level! However, we do recommend keeping reports enabled (via the rua tag) in case any issues may arise and you can review reports to see if DMARC is the cause."
+        ],
+        "domain": [
+          "Your domain is using TLS 1.3, no further action needed!"
+        ],
+        "mx": [
+          "mx01.1and1.com: Failed to reach domain",
+          "mx00.1and1.com: Failed to reach domain"
+        ],
+        "spf": [
+          "SPF seems to be setup correctly! No further action needed."
+        ]
+      }
+    }
+  ]
+}
 ```
 
 ## Serve Dedicated Mailbox
@@ -190,7 +193,7 @@ Which will return a JSON response like this:
 You can also serve scan results via a dedicated mailbox. It is advised that you use this mailbox for this sole purpose, as all emails will be deleted at each 10 second interval.
 
 ```shell
-dss serve mail --inboundHost "imap.gmail.com:993" --inboundPass "SomePassword" --inboundUser "SomeAddress@domain.tld" --outboundHost "smtp.gmail.com:587" --outboundPass "SomePassword" --outboundUser "SomeAddress@domain.tld"
+dss serve mail --inboundHost "imap.gmail.com:993" --inboundPass "SomePassword" --inboundUser "SomeAddress@domain.tld" --outboundHost "smtp.gmail.com:587" --outboundPass "SomePassword" --outboundUser "SomeAddress@domain.tld" --advise
 ```
 
 You can then email this inbox from any address, and you'll receive an email back with your scan results.
@@ -199,16 +202,16 @@ You can then email this inbox from any address, and you'll receive an email back
 | Flag             | Short | Description                                                                                                     |
 |------------------|-------|-----------------------------------------------------------------------------------------------------------------|
 | `--advise`       | `-a`  | Provide suggestions for incorrect/missing mail security features                                                |
-| `--cache`        |       | Cache scan results for 60 seconds                                                                               |
-| `--checkTls`     |       | Check the TLS connectivity and cert validity of domains                                                         |
-| `--concurrent`   | `-c`  | The number of domains to scan concurrently (default 10)                                                         |
+| `--cache`        |       | Specify how long to cache results for (default 3m)                                                              |
+| `--checkTLS`     |       | Check the TLS connectivity and cert validity of domains                                                         |
+| `--concurrent`   | `-c`  | The number of domains to scan concurrently (defaults to your number of CPU threads)                             |
 | `--debug`        | `-d`  | Print debug logs                                                                                                |
 | `--dkimSelector` |       | Specify a comma seperated list of DKIM selectors (default "")                                                   |
 | `--dnsBuffer`    |       | Specify the allocated buffer for DNS responses (default 1024)                                                   |
 | `--format`       | `-f`  | Format to print results in (yaml, json, csv) (default "yaml")                                                   |
 | `--nameservers`  | `-n`  | Use specific nameservers, in host[:port] format; may be specified multiple times                                |
 | `--outputFile`   | `-o`  | Output the results to a specified file (creates a file with the current unix timestamp if no file is specified) |
-| `--timeout`      | `-t`  | Timeout duration for a DNS query (default 15)                                                                   |
+| `--timeout`      | `-t`  | Timeout duration for a DNS query (default 15s)                                                                  |
 | `--zoneFile`     | `-z`  | Input file/pipe containing an RFC 1035 zone file                                                                |
 
 ## License

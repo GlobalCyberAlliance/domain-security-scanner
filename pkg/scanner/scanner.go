@@ -1,7 +1,8 @@
 package scanner
 
 import (
-	"net"
+	"fmt"
+	"io"
 	"runtime"
 	"strings"
 	"sync"
@@ -9,47 +10,20 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/panjf2000/ants/v2"
 	"github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
-)
-
-const (
-	DefaultBIMIPrefix  = "v=BIMI1;"
-	DefaultDKIMPrefix  = "v=DKIM1;"
-	DefaultDMARCPrefix = "v=DMARC1;"
-	DefaultSPFPrefix   = "v=spf1 "
-)
-
-var (
-	BIMIPrefix  = DefaultBIMIPrefix
-	DKIMPrefix  = DefaultDKIMPrefix
-	DMARCPrefix = DefaultDMARCPrefix
-	SPFPrefix   = DefaultSPFPrefix
-
-	// knownDkimSelectors is a list of known DKIM selectors.
-	knownDkimSelectors = []string{
-		"x",             // Generic
-		"google",        // Google
-		"selector1",     // Microsoft
-		"selector2",     // Microsoft
-		"k1",            // MailChimp
-		"mandrill",      // Mandrill
-		"everlytickey1", // Everlytic
-		"everlytickey2", // Everlytic
-		"dkim",          // Hetzner
-		"mxvault",       // MxVault
-	}
+	"github.com/rs/zerolog"
+	"github.com/spf13/cast"
 )
 
 type (
-	// Scanner is a type that queries the DNS records for domain names, looking
-	// for specific resource records.
 	Scanner struct {
-		// cache is a simple in-memory cache to reduce external requests from he scanner.
+		// cache is a simple in-memory cache to reduce external requests from the scanner.
 		cache *cache.Cache
 
-		// cacheEnabled specifies whether the scanner should utilize the in-memory cache or not.
-		cacheEnabled bool
+		// cacheDuration is the time-to-live for cache entries.
+		cacheDuration time.Duration
 
 		// dkimSelectors is used to specify where a DKIM record is hosted for a specific domain.
 		dkimSelectors []string
@@ -66,240 +40,192 @@ type (
 		// method.
 		lastNameserverIndex uint32
 
+		// logger is the logger for the scanner.
+		logger zerolog.Logger
+
 		// nameservers is a slice of "host:port" strings of nameservers to issue queries against.
 		nameservers []string
 
-		// A channel to use as a semaphore for limiting the number of DNS queries that can be made concurrently.
-		sem chan struct{}
+		// pool is the pool of workers for the scanner.
+		pool *ants.Pool
+
+		// poolSize is the size of the pool of workers for the scanner.
+		poolSize uint16
 	}
 
-	// ScannerOption defines a functional configuration type for a *Scanner.
-	ScannerOption func(*Scanner) error
+	// Option defines a functional configuration type for a *Scanner.
+	Option func(*Scanner) error
 
-	// ScanResult holds the results of scanning a domain's DNS records.
-	ScanResult struct {
-		Domain  string   `json:"domain" yaml:"domain,omitempty"`
-		Elapsed int64    `json:"elapsed,omitempty" yaml:"elapsed,omitempty"`
-		Error   string   `json:"error,omitempty" yaml:"error,omitempty"`
-		A       []string `json:"a,omitempty" yaml:"a,omitempty"`
-		AAAA    []string `json:"aaaa,omitempty" yaml:"aaaa,omitempty"`
-		BIMI    string   `json:"bimi,omitempty" yaml:"bimi,omitempty"`
-		CNAME   string   `json:"cname,omitempty" yaml:"cname,omitempty"`
-		DKIM    string   `json:"dkim,omitempty" yaml:"dkim,omitempty"`
-		DMARC   string   `json:"dmarc,omitempty" yaml:"dmarc,omitempty"`
-		MX      []string `json:"mx,omitempty" yaml:"mx,omitempty"`
-		NS      []string `json:"ns,omitempty" yaml:"ns,omitempty"`
-		SPF     string   `json:"spf,omitempty" yaml:"spf,omitempty"`
-		TXT     []string `json:"txt,omitempty" yaml:"txt,omitempty"`
+	// Result holds the results of scanning a domain's DNS records.
+	Result struct {
+		Domain string   `json:"domain" yaml:"domain,omitempty" doc:"The domain name being scanned." example:"example.com"`
+		Error  string   `json:"error,omitempty" yaml:"error,omitempty" doc:"An error message if the scan failed." example:"invalid domain name"`
+		BIMI   string   `json:"bimi,omitempty" yaml:"bimi,omitempty" doc:"The BIMI record for the domain." example:"https://example.com/bimi.svg"`
+		DKIM   string   `json:"dkim,omitempty" yaml:"dkim,omitempty" doc:"The DKIM record for the domain." example:"v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA"`
+		DMARC  string   `json:"dmarc,omitempty" yaml:"dmarc,omitempty" doc:"The DMARC record for the domain." example:"v=DMARC1; p=none"`
+		MX     []string `json:"mx,omitempty" yaml:"mx,omitempty" doc:"The MX records for the domain." example:"aspmx.l.google.com"`
+		NS     []string `json:"ns,omitempty" yaml:"ns,omitempty" doc:"The NS records for the domain." example:"ns1.example.com"`
+		SPF    string   `json:"spf,omitempty" yaml:"spf,omitempty" doc:"The SPF record for the domain."example:"v=spf1 include:_spf.google.com ~all"`
 	}
 )
 
-// New is a function that initializes and returns a new instance of the Scanner struct.
-// It accepts a variadic number of ScannerOption functions that can be used to configure the Scanner instance.
-func New(options ...ScannerOption) (*Scanner, error) {
-	// Create a new Scanner instance with some default values
-	s := &Scanner{
-		dnsClient:   new(dns.Client),                                    // Initialize a new dns.Client
-		dnsBuffer:   1024,                                               // Set the dnsBuffer size to 1024 bytes
-		nameservers: []string{"8.8.8.8:53", "8.8.4.4:53", "1.1.1.1:53"}, // Set the default nameservers to Google and Cloudflare
+func New(logger zerolog.Logger, timeout time.Duration, opts ...Option) (*Scanner, error) {
+	if timeout <= 0 {
+		return nil, errors.New("timeout must be greater than 0")
 	}
 
-	// Apply each of the provided options to the Scanner instance.
-	// If any of the options return an error, wrap the error with additional context and return it immediately.
-	for _, option := range options {
-		if err := option(s); err != nil {
+	dnsClient := new(dns.Client)
+	dnsClient.Timeout = timeout
+
+	scanner := &Scanner{
+		dnsClient:   dnsClient, // Initialize a new dns.Client
+		dnsBuffer:   1024,      // Set the dnsBuffer size to 1024 bytes
+		logger:      logger,
+		nameservers: []string{"8.8.8.8:53", "8.8.4.4:53", "1.1.1.1:53"}, // Set the default nameservers to Google and Cloudflare
+		poolSize:    uint16(runtime.NumCPU()),
+	}
+
+	for _, opt := range opts {
+		if err := opt(scanner); err != nil {
 			return nil, errors.Wrap(err, "apply option")
 		}
 	}
 
-	// If no semaphore channel (s.sem) has been set by the options, create a new one with a capacity equal to the number of CPU cores available
-	if s.sem == nil {
-		s.sem = make(chan struct{}, runtime.NumCPU())
+	// Initialize cache
+	scanner.cache = cache.New(scanner.cacheDuration, 5*time.Minute)
+
+	// Create a new pool of workers for the scanner
+	pool, err := ants.NewPool(int(scanner.poolSize), ants.WithExpiryDuration(timeout), ants.WithPanicHandler(func(err interface{}) {
+		scanner.logger.Error().Err(errors.New(cast.ToString(err))).Msg("unrecoverable panic occurred while analysing pcap")
+	}))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create scanner pool: %w", err)
 	}
 
-	// Fill the semaphore channel with empty struct{} instances
-	for i := 0; i < cap(s.sem); i++ {
-		s.sem <- struct{}{}
+	scanner.pool = pool
+
+	return scanner, nil
+}
+
+// Scan scans a list of domains and returns the results.
+func (s *Scanner) Scan(domains ...string) ([]*Result, error) {
+	if s.pool == nil {
+		return nil, fmt.Errorf("scanner is closed")
 	}
 
-	// Return the configured Scanner instance
-	return s, nil
-}
-
-// OverwriteOption allows the caller to overwrite an existing option.
-func (s *Scanner) OverwriteOption(option ScannerOption) error {
-	return option(s)
-}
-
-// WithCache enables domain caching for the scanner. This is a simple
-// implementation, intended to mitigate abuse attempts.
-func WithCache(enable bool) ScannerOption {
-	return func(s *Scanner) error {
-		if enable {
-			s.cache = cache.New(1*time.Minute, 5*time.Minute)
-			s.cacheEnabled = true
+	for _, domain := range domains {
+		if domain == "" {
+			return nil, errors.New("empty domain")
 		}
-		return nil
 	}
-}
 
-// WithConcurrentScans sets the number of domains that will be scanned
-// concurrently.
-//
-// If n <= 0, then this option will default to the return value of
-// runtime.NumCPU().
-func WithConcurrentScans(n int) ScannerOption {
-	return func(s *Scanner) error {
-		if n <= 0 {
-			n = runtime.NumCPU()
-		}
-
-		if s.sem != nil {
-			close(s.sem)
-		}
-
-		s.sem = make(chan struct{}, n)
-
-		return nil
+	if len(domains) == 0 {
+		return nil, errors.New("no domains to scan")
 	}
-}
 
-// WithDKIMSelectors allows the caller to specify which DKIM selectors to
-// scan for (falling back to the default selectors if none are provided).
-func WithDKIMSelectors(selectors ...string) ScannerOption {
-	return func(s *Scanner) error {
-		s.dkimSelectors = selectors
-		return nil
-	}
-}
-
-// WithDNSBuffer increases the allocated buffer for DNS responses
-func WithDNSBuffer(bufferSize uint16) ScannerOption {
-	return func(s *Scanner) error {
-		if bufferSize > 4096 {
-			return errors.New("buffer size should not be larger than 4096")
-		}
-
-		s.dnsBuffer = bufferSize
-		return nil
-	}
-}
-
-// WithNameservers allows the caller to provide a custom set of nameservers for
-// a *Scanner to use. If ns is nil, or zero-length, the *Scanner will use
-// the nameservers specified in /etc/resolv.conf.
-func WithNameservers(ns []string) ScannerOption {
-	return func(s *Scanner) error {
-		// If the provided slice of nameservers is nil, or has zero
-		// elements, load up /etc/resolv.conf, and get the "nameserver"
-		// directives from there.
-		if len(ns) == 0 {
-			ns = []string{"8.8.8.8:53", "8.8.4.4:53", "1.1.1.1:53"}
-
-			config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
-			if err == nil {
-				ns = config.Servers[:]
-			}
-		}
-
-		// Make sure each of the nameservers is in the "host:port" format.
-		//
-		// The "dns" package requires that you explicitly state the port
-		// number for the resolvers that get queried.
-		for i := range ns {
-			host, port, err := net.SplitHostPort(ns[i])
-			if err != nil {
-				// no port is specified
-				if strings.Count(ns[i], ":") > 2 && !strings.Contains(ns[i], "[") {
-					// handle IPv6 addresses without brackets
-					ns[i] = "[" + ns[i] + "]:53"
-				} else {
-					// handle regular addresses or IPv6 with brackets
-					ns[i] = ns[i] + ":53"
-				}
-			} else if port == "" {
-				ns[i] = net.JoinHostPort(host, "53")
-			}
-		}
-
-		s.nameservers = ns[:]
-
-		return nil
-	}
-}
-
-// WithTimeout sets the timeout duration of a DNS query.
-func WithTimeout(timeout time.Duration) ScannerOption {
-	return func(s *Scanner) error {
-		s.dnsClient.Timeout = timeout
-		return nil
-	}
-}
-
-// Start consumes domain names from the Source src, scans the domain name's
-// DNS records, and returns a channel of the results.
-func (s *Scanner) Start(src Source) <-chan *ScanResult {
-	results := make(chan *ScanResult)
-	go s.start(src, results)
-	return results
-}
-
-func (s *Scanner) start(src Source, ch chan *ScanResult) {
-	defer close(ch)
-
+	var mutex sync.Mutex
+	var results []*Result
 	var wg sync.WaitGroup
-	for domain := range src.Read() {
-		<-s.sem
+
+	for _, domainToScan := range domains {
 		wg.Add(1)
-		go func(domain string) {
-			ch <- s.Scan(domain)
-			s.sem <- struct{}{}
-			wg.Done()
-		}(domain)
+
+		if err := s.pool.Submit(func() {
+			result := &Result{
+				Domain: domainToScan,
+			}
+
+			defer func() {
+				wg.Done()
+			}()
+
+			if s.cache != nil {
+				if scanResult, ok := s.cache.Get(domainToScan); ok {
+					s.logger.Debug().Msg("cache hit for " + domainToScan)
+
+					mutex.Lock()
+					results = append(results, scanResult.(*Result))
+					mutex.Unlock()
+
+					return
+				}
+
+				s.logger.Debug().Msg("cache miss for " + domainToScan)
+
+				defer func() {
+					s.cache.Set(domainToScan, result, 3*time.Minute)
+				}()
+			}
+
+			// check that the domain name is valid
+			records, err := s.getDNSAnswers(domainToScan, dns.TypeNS)
+			if err != nil || len(records) == 0 {
+				// check if TXT records exist, as the nameserver check won't work for subdomains
+				records, err = s.getDNSAnswers(domainToScan, dns.TypeTXT)
+				if err != nil || len(records) == 0 {
+					// fill variable to satisfy deferred cache fill
+					result = &Result{
+						Domain: domainToScan,
+						Error:  "invalid domain name",
+					}
+
+					mutex.Lock()
+					results = append(results, result)
+					mutex.Unlock()
+
+					return
+				}
+			}
+
+			if err = s.GetDNSRecords(result, "BIMI", "DKIM", "DMARC", "MX", "NS", "SPF"); err != nil {
+				result.Error = err.Error()
+			}
+
+			mutex.Lock()
+			results = append(results, result)
+			mutex.Unlock()
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	wg.Wait()
+
+	return results, nil
 }
 
-// Scan allows the caller to use the *Scanner's underlying data structures
-// for performing a one-off scan of the given domain name.
-func (s *Scanner) Scan(domain string) (result *ScanResult) {
-	if s.cacheEnabled {
-		if scanResult, ok := s.cache.Get(domain); ok {
-			return scanResult.(*ScanResult)
+func (s *Scanner) ScanZone(zone io.Reader) ([]*Result, error) {
+	if s.pool == nil {
+		return nil, fmt.Errorf("scanner is closed")
+	}
+
+	zoneParser := dns.NewZoneParser(zone, "", "")
+	zoneParser.SetIncludeAllowed(true)
+
+	var domains []string
+
+	for tok, ok := zoneParser.Next(); ok; tok, ok = zoneParser.Next() {
+		if tok.Header().Rrtype == dns.TypeNS {
+			continue
 		}
 
-		defer func() {
-			s.cache.Set(domain, result, 3*time.Minute)
-		}()
-	}
-
-	// check that the domain name is valid
-	records, err := s.getDNSAnswers(domain, dns.TypeNS)
-	if err != nil || len(records) == 0 {
-		// check if TXT records exist, as the nameserver check won't work for subdomains
-		records, err = s.getDNSAnswers(domain, dns.TypeTXT)
-		if err != nil || len(records) == 0 {
-			// fill variable to satisfy deferred cache fill
-			result = &ScanResult{
-				Domain: domain,
-				Error:  "invalid domain name",
-			}
-
-			return result
+		domain := strings.Trim(tok.Header().Name, ".")
+		if !strings.Contains(domain, ".") {
+			// we have an NS record that serves as an anchor, and should skip it
+			continue
 		}
+
+		domains = append(domains, domain)
 	}
 
-	result = &ScanResult{Domain: domain}
-	start := time.Now()
+	return s.Scan(domains...)
+}
 
-	if err = s.GetDNSRecords(result, "BIMI", "DKIM", "DMARC", "MX", "NS", "SPF"); err != nil {
-		result.Error = err.Error()
-	}
-
-	result.Elapsed = time.Since(start).Milliseconds()
-
-	return result
+// Close closes the scanner
+func (s *Scanner) Close() {
+	s.pool.Release()
+	s.cache.Flush()
+	s.logger.Debug().Msg("scanner closed")
 }
 
 func (s *Scanner) getNS() string {

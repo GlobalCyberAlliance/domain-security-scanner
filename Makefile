@@ -3,6 +3,7 @@ GO				 := $(shell which go 2>/dev/null)
 GOFIELDALIGNMENT := $(shell which fieldalignment 2>/dev/null)
 GOFUMPT			 := $(shell which gofumpt 2>/dev/null)
 GOLINTER		 := $(shell which staticcheck 2>/dev/null)
+GONILAWAY        := $(shell which nilaway 2>/dev/null)
 GO_BENCH_FLAGS	 := -short -bench=. -benchmem
 GO_BENCH		 := $(GO) test $(GO_BENCH_FLAGS)
 GO_BUILD		 := CGO_ENABLED=0 $(GO) build -ldflags "-s -w" -trimpath
@@ -54,6 +55,14 @@ lint:
 	fi
 	@echo "Running linter..."
 	@$(GOLINTER) ./...
+
+nil:
+	@if [ -z "${GONILAWAY}" ]; then \
+		echo "Cannot find 'nilaway' in your $$PATH"; \
+		exit 1; \
+	fi
+	@echo "Running nilaway..."
+	@$(GONILAWAY) ./...
 
 optimize:
 	@echo "Creating temporary build directory..."

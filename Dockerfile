@@ -1,6 +1,7 @@
-FROM golang:1.21-alpine3.18 AS build
+FROM golang:1.22-alpine3.19 AS build
 
 RUN apk add git make \
+ && apk cache clean \
  && go install golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest
 
 COPY . /go/src/github.com/GlobalCyberAlliance/domain-security-scanner/

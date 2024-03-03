@@ -7,6 +7,7 @@ import (
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/http"
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/mail"
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/scanner"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 )
 
@@ -47,24 +48,27 @@ var (
 		Use:   "api",
 		Short: "Serve DNS security queries via a dedicated API",
 		Run: func(command *cobra.Command, args []string) {
-			server := http.NewServer(log)
-
-			opts := []scanner.ScannerOption{
-				scanner.WithCache(cacheEnabled),
+			opts := []scanner.Option{
+				scanner.WithCacheDuration(cache),
 				scanner.WithConcurrentScans(concurrent),
-				scanner.WithDKIMSelectors(dkimSelector...),
 				scanner.WithDNSBuffer(dnsBuffer),
 				scanner.WithNameservers(nameservers),
-				scanner.WithTimeout(time.Duration(timeout) * time.Second),
 			}
 
-			sc, err := scanner.New(opts...)
+			if len(dkimSelector) > 0 {
+				opts = append(opts, scanner.WithDKIMSelectors(dkimSelector...))
+			}
+
+			sc, err := scanner.New(zerolog.Logger{}, timeout, opts...)
 			if err != nil {
 				log.Fatal().Err(err).Msg("could not create domain scanner")
 			}
 
-			server.Advisor = advisor.NewAdvisor(time.Duration(timeout)*time.Second, cacheEnabled)
-			server.CheckTls = checkTls
+			server := http.NewServer(log, cmd.Version)
+			if advise {
+				server.Advisor = advisor.NewAdvisor(timeout, cache, checkTLS)
+			}
+			server.CheckTls = checkTLS
 			server.Scanner = sc
 
 			server.Serve(port)
@@ -75,26 +79,28 @@ var (
 		Use:   "mail",
 		Short: "Serve DNS security queries via a dedicated email account",
 		Run: func(command *cobra.Command, args []string) {
-			opts := []scanner.ScannerOption{
-				scanner.WithCache(cacheEnabled),
+			opts := []scanner.Option{
+				scanner.WithCacheDuration(cache),
 				scanner.WithConcurrentScans(concurrent),
-				scanner.WithDKIMSelectors(dkimSelector...),
 				scanner.WithDNSBuffer(dnsBuffer),
 				scanner.WithNameservers(nameservers),
-				scanner.WithTimeout(time.Duration(timeout) * time.Second),
 			}
 
-			sc, err := scanner.New(opts...)
+			if len(dkimSelector) > 0 {
+				opts = append(opts, scanner.WithDKIMSelectors(dkimSelector...))
+			}
+
+			sc, err := scanner.New(zerolog.Logger{}, timeout, opts...)
 			if err != nil {
-				log.Fatal().Err(err).Msg("could not create scanner")
+				log.Fatal().Err(err).Msg("could not create domain scanner")
 			}
 
-			mailServer, err := mail.NewMailServer(mailConfig, log, sc, advisor.NewAdvisor(time.Duration(timeout)*time.Second, cacheEnabled))
+			mailServer, err := mail.NewMailServer(mailConfig, log, sc, advisor.NewAdvisor(timeout, cache, checkTLS))
 			if err != nil {
 				log.Fatal().Err(err).Msg("could not open mail server connection")
 			}
 
-			mailServer.CheckTls = checkTls
+			mailServer.CheckTls = checkTLS
 
 			mailServer.Serve(interval)
 		},

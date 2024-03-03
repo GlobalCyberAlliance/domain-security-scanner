@@ -1,25 +1,30 @@
 package mail
 
 import (
-	"github.com/patrickmn/go-cache"
-	"strings"
+	"fmt"
+	htmlTmpl "html/template"
+	textTmpl "text/template"
 	"time"
 
 	domainAdvisor "github.com/GlobalCyberAlliance/domain-security-scanner/pkg/advisor"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/model"
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/scanner"
+	"github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cast"
 )
 
 type Server struct {
-	advisor  *domainAdvisor.Advisor
-	config   Config
-	cooldown *cache.Cache
-	interval time.Duration
-	logger   zerolog.Logger
-	CheckTls bool
-	Scanner  *scanner.Scanner
+	advisor      *domainAdvisor.Advisor
+	config       Config
+	cooldown     *cache.Cache
+	interval     time.Duration
+	logger       zerolog.Logger
+	templateHtml *htmlTmpl.Template
+	templateText *textTmpl.Template
+	CheckTls     bool
+	Scanner      *scanner.Scanner
 }
 
 // NewMailServer returns a new instance of a mail server
@@ -37,6 +42,10 @@ func NewMailServer(config Config, logger zerolog.Logger, sc *scanner.Scanner, ad
 		return nil, err
 	}
 	defer client.Logout()
+
+	if err = s.initializeTemplates(); err != nil {
+		return nil, fmt.Errorf("failed to initialize mail templates: %w", err)
+	}
 
 	return &s, nil
 }
@@ -76,17 +85,32 @@ func (s *Server) handler() error {
 				domainList = append(domainList, domain)
 			}
 
-			sourceDomainList := strings.NewReader(strings.Join(domainList, "\n"))
-			source := scanner.NewSource(sourceDomainList, scanner.TextSourceType)
+			if len(domainList) == 0 {
+				continue
+			}
 
-			for result := range s.Scanner.Start(source) {
+			results, err := s.Scanner.Scan(domainList...)
+			if err != nil {
+				s.logger.Error().Err(err).Msg("An error occurred while scanning domains")
+				continue
+			}
+
+			for _, result := range results {
 				sender := addresses[result.Domain].Address
 
 				if addresses[result.Domain].DKIM != "" {
 					result.DKIM = addresses[result.Domain].DKIM
 				}
 
-				if err = s.SendMail(sender, s.PrepareEmail(result)); err != nil {
+				resultWithAdvice := model.ScanResultWithAdvice{
+					ScanResult: result,
+				}
+
+				if s.advisor != nil || result.Error == "" {
+					resultWithAdvice.Advice = s.advisor.CheckAll(result.Domain, result.BIMI, result.DKIM, result.DMARC, result.MX, result.SPF)
+				}
+
+				if err = s.SendMail(sender, resultWithAdvice); err != nil {
 					s.logger.Error().Err(err).Msg("An error occurred while sending scan results to " + sender)
 					continue
 				}

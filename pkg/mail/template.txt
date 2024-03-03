@@ -1,0 +1,29 @@
+---------------------------------
+Your email security scan results:
+---------------------------------
+
+* Domain: {{ .AdviceDomain }}
+* BIMI: {{ .AdviceBIMI }}
+* DKIM: {{ .AdviceDKIM }}
+* DMARC: {{ .AdviceDMARC }}
+* MX: {{ .AdviceMX }}
+* SPF: {{ .AdviceSPF }}
+
++--------+--------------------------+
+|  TEST  |           RESULT         |
++--------+--------------------------+
+| DOMAIN | {{ .ResultDomain }} |                                                                                                                                                       |
+| BIMI   | {{ .ResultBIMI }}   |                                                                                                                                                         |
+| DKIM   | {{ .ResultDKIM }}   |
+| DMARC  | {{ .ResultDMARC }}  |
+| MX     | {{ .ResultMX }}     |
+| SPF    | {{ .ResultSPF }}    |                                                                                                                                           |
++--------+--------------------------+
+
+For more information, visit our comprehensive mail security guide at https://dmarcguide.globalcyberalliance.org
+
+Thanks,
+Domain Security Scanner
+
+Developed by
+Global Cyber Alliance

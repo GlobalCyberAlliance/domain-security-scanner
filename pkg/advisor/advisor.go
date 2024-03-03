@@ -2,7 +2,6 @@ package advisor
 
 import (
 	"crypto/tls"
-	"github.com/patrickmn/go-cache"
 	"net"
 	"net/http"
 	"net/smtp"
@@ -12,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/patrickmn/go-cache"
 	"github.com/spf13/cast"
 )
 
@@ -22,9 +22,18 @@ type (
 		consumerDomains      map[string]struct{}
 		consumerDomainsMutex *sync.Mutex
 		dialer               *net.Dialer
-		tlsCacheEnabled      bool
 		tlsCacheHost         *cache.Cache
 		tlsCacheMail         *cache.Cache
+		checkTLS             bool
+	}
+
+	Advice struct {
+		Domain []string `json:"domain,omitempty" yaml:"domain,omitempty" doc:"Domain advice." example:"Your domain looks good! No further action needed."`
+		BIMI   []string `json:"bimi,omitempty" yaml:"bimi,omitempty" doc:"BIMI advice." example:"Your BIMI record looks good! No further action needed."`
+		DKIM   []string `json:"dkim,omitempty" yaml:"dkim,omitempty" doc:"DKIM advice." example:"DKIM is setup for this email server. However, if you have other 3rd party systems, please send a test email to confirm DKIM is setup properly."`
+		DMARC  []string `json:"dmarc,omitempty" yaml:"dmarc,omitempty" doc:"DMARC advice." example:"You are currently at the lowest level and receiving reports, which is a great starting point. Please make sure to review the reports, make the appropriate adjustments, and move to either quarantine or reject soon."`
+		MX     []string `json:"mx,omitempty" yaml:"mx,omitempty" doc:"MX advice." example:"You have a multiple mail servers setup! No further action needed."`
+		SPF    []string `json:"spf,omitempty" yaml:"spf,omitempty" doc:"SPF advice." example:"SPF seems to be setup correctly! No further action needed."`
 	}
 
 	// dmarc represents the structure of a DMARC record
@@ -43,17 +52,14 @@ type (
 	}
 )
 
-func NewAdvisor(timeout time.Duration, tlsCacheEnabled bool) *Advisor {
+func NewAdvisor(timeout time.Duration, cacheLifetime time.Duration, checkTLS bool) *Advisor {
 	advisor := Advisor{
+		checkTLS:             checkTLS,
 		consumerDomains:      make(map[string]struct{}),
 		consumerDomainsMutex: &sync.Mutex{},
 		dialer:               &net.Dialer{Timeout: timeout},
-		tlsCacheEnabled:      tlsCacheEnabled,
-	}
-
-	if tlsCacheEnabled {
-		advisor.tlsCacheHost = cache.New(1*time.Minute, 5*time.Minute)
-		advisor.tlsCacheMail = cache.New(1*time.Minute, 5*time.Minute)
+		tlsCacheHost:         cache.New(cacheLifetime, 5*time.Minute),
+		tlsCacheMail:         cache.New(cacheLifetime, 5*time.Minute),
 	}
 
 	for _, domain := range consumerDomainList {
@@ -63,17 +69,53 @@ func NewAdvisor(timeout time.Duration, tlsCacheEnabled bool) *Advisor {
 	return &advisor
 }
 
-func (a *Advisor) CheckAll(bimi string, dkim string, dmarc string, domain string, mx []string, spf string, checkTls bool) (advice map[string][]string) {
-	advice = make(map[string][]string)
+func (a *Advisor) CheckAll(domain string, bimi string, dkim string, dmarc string, mx []string, spf string) *Advice {
+	var adviceDomain, adviceBIMI, adviceDKIM, adviceDMARC, adviceMX, adviceSPF []string
+	var wg sync.WaitGroup
 
-	advice["bimi"] = a.CheckBIMI(bimi)
-	advice["dkim"] = a.CheckDKIM(dkim)
-	advice["dmarc"] = a.CheckDMARC(dmarc)
-	advice["domain"] = a.CheckDomain(domain, checkTls)
-	advice["mx"] = a.CheckMX(mx, checkTls)
-	advice["spf"] = a.CheckSPF(spf)
+	wg.Add(6)
+	go func() {
+		adviceDomain = a.CheckDomain(domain)
+		wg.Done()
+	}()
 
-	return advice
+	go func() {
+		adviceBIMI = a.CheckBIMI(bimi)
+		wg.Done()
+	}()
+
+	go func() {
+		adviceDKIM = a.CheckDKIM(dkim)
+		wg.Done()
+	}()
+
+	go func() {
+		adviceDMARC = a.CheckDMARC(dmarc)
+		wg.Done()
+	}()
+
+	go func() {
+		adviceMX = a.CheckMX(mx)
+		wg.Done()
+	}()
+
+	go func() {
+		adviceSPF = a.CheckSPF(spf)
+		wg.Done()
+	}()
+
+	wg.Wait()
+
+	advice := Advice{
+		Domain: adviceDomain,
+		BIMI:   adviceBIMI,
+		DKIM:   adviceDKIM,
+		DMARC:  adviceDMARC,
+		MX:     adviceMX,
+		SPF:    adviceSPF,
+	}
+
+	return &advice
 }
 
 func (a *Advisor) CheckBIMI(bimi string) (advice []string) {
@@ -98,7 +140,7 @@ func (a *Advisor) CheckBIMI(bimi string) (advice []string) {
 
 				// download SVG logo
 				response, err := http.Head(tagValue)
-				if err != nil {
+				if err != nil || response == nil {
 					advice = append(advice, "Your SVG logo could not be downloaded.")
 					continue
 				}
@@ -120,7 +162,7 @@ func (a *Advisor) CheckBIMI(bimi string) (advice []string) {
 
 				// download VMC cert
 				response, err := http.Head(tagValue)
-				if err != nil {
+				if err != nil || response == nil {
 					advice = append(advice, "Your VMC certificate could not be downloaded.")
 					continue
 				}
@@ -327,7 +369,7 @@ func (a *Advisor) CheckDMARC(record string) (advice []string) {
 	return dmarcRecord.Advice
 }
 
-func (a *Advisor) CheckDomain(domain string, checkTls bool) (advice []string) {
+func (a *Advisor) CheckDomain(domain string) (advice []string) {
 	a.consumerDomainsMutex.Lock()
 	if _, ok := a.consumerDomains[domain]; ok {
 		a.consumerDomainsMutex.Unlock()
@@ -335,7 +377,7 @@ func (a *Advisor) CheckDomain(domain string, checkTls bool) (advice []string) {
 	}
 	a.consumerDomainsMutex.Unlock()
 
-	if checkTls {
+	if a.checkTLS {
 		advice = append(advice, a.checkHostTls(domain, 443)...)
 	}
 
@@ -346,7 +388,7 @@ func (a *Advisor) CheckDomain(domain string, checkTls bool) (advice []string) {
 	return advice
 }
 
-func (a *Advisor) CheckMX(mx []string, checkTls bool) (advice []string) {
+func (a *Advisor) CheckMX(mx []string) (advice []string) {
 	switch len(mx) {
 	case 0:
 		return []string{"You do not have any mail servers setup, so you cannot receive email at this domain."}
@@ -356,7 +398,7 @@ func (a *Advisor) CheckMX(mx []string, checkTls bool) (advice []string) {
 		advice = []string{"You have multiple mail servers setup, which is recommended."}
 	}
 
-	if checkTls {
+	if a.checkTLS {
 		for _, serverAddress := range mx {
 			// prepend the hostname to the advice line
 			mxAdvice := a.checkMailTls(serverAddress)
@@ -411,15 +453,15 @@ func (a *Advisor) checkHostTls(hostname string, port int) (advice []string) {
 		hostname = hostname[:len(hostname)-1]
 	}
 
-	if a.tlsCacheEnabled {
-		if tlsAdvice, ok := a.tlsCacheHost.Get(hostname); ok {
-			return tlsAdvice.([]string)
-		}
-
-		defer func() {
-			a.tlsCacheHost.Set(hostname, advice, 3*time.Minute)
-		}()
+	// check if the advice is already in the cache
+	if tlsAdvice, ok := a.tlsCacheHost.Get(hostname); ok {
+		return tlsAdvice.([]string)
 	}
+
+	// set the advice in the cache after the function returns
+	defer func() {
+		a.tlsCacheHost.Set(hostname, advice, 3*time.Minute)
+	}()
 
 	if port == 0 {
 		port = 443
@@ -446,7 +488,7 @@ func (a *Advisor) checkHostTls(hostname string, port int) (advice []string) {
 	}
 	defer conn.Close()
 
-	advice = append(advice, checkTlsVersion(conn.ConnectionState().Version))
+	advice = append(advice, checkTLSVersion(conn.ConnectionState().Version))
 
 	return advice
 }
@@ -457,15 +499,15 @@ func (a *Advisor) checkMailTls(hostname string) (advice []string) {
 		hostname = hostname[:len(hostname)-1]
 	}
 
-	if a.tlsCacheEnabled {
-		if tlsAdvice, ok := a.tlsCacheMail.Get(hostname); ok {
-			return tlsAdvice.([]string)
-		}
-
-		defer func() {
-			a.tlsCacheMail.Set(hostname, advice, 3*time.Minute)
-		}()
+	// check if the advice is already in the cache
+	if tlsAdvice, ok := a.tlsCacheMail.Get(hostname); ok {
+		return tlsAdvice.([]string)
 	}
+
+	// set the advice in the cache after the function returns
+	defer func() {
+		a.tlsCacheMail.Set(hostname, advice, 3*time.Minute)
+	}()
 
 	conn, err := a.dialer.Dial("tcp", hostname+":25")
 	if err != nil {
@@ -533,13 +575,13 @@ func (a *Advisor) checkMailTls(hostname string) (advice []string) {
 	}
 
 	if state, ok := client.TLSConnectionState(); ok {
-		advice = append(advice, checkTlsVersion(state.Version))
+		advice = append(advice, checkTLSVersion(state.Version))
 	}
 
 	return advice
 }
 
-func checkTlsVersion(tlsVersion uint16) string {
+func checkTLSVersion(tlsVersion uint16) string {
 	switch tlsVersion {
 	case tls.VersionTLS10:
 		return "Your domain is using TLS version 1.0 which is outdated, and should be upgraded to TLS 1.3."

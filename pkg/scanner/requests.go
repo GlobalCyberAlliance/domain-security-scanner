@@ -8,6 +8,34 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	DefaultBIMIPrefix  = "v=BIMI1;"
+	DefaultDKIMPrefix  = "v=DKIM1;"
+	DefaultDMARCPrefix = "v=DMARC1;"
+	DefaultSPFPrefix   = "v=spf1 "
+)
+
+var (
+	BIMIPrefix  = DefaultBIMIPrefix
+	DKIMPrefix  = DefaultDKIMPrefix
+	DMARCPrefix = DefaultDMARCPrefix
+	SPFPrefix   = DefaultSPFPrefix
+
+	// knownDkimSelectors is a list of known DKIM selectors.
+	knownDkimSelectors = []string{
+		"x",             // Generic
+		"google",        // Google
+		"selector1",     // Microsoft
+		"selector2",     // Microsoft
+		"k1",            // MailChimp
+		"mandrill",      // Mandrill
+		"everlytickey1", // Everlytic
+		"everlytickey2", // Everlytic
+		"dkim",          // Hetzner
+		"mxvault",       // MxVault
+	}
+)
+
 // getDNSRecords queries the DNS server for records of a specific type for a domain.
 // It returns a slice of strings (the records) and an error if any occurred.
 func (s *Scanner) getDNSRecords(domain string, recordType uint16) (records []string, err error) {
@@ -62,7 +90,7 @@ func (s *Scanner) getDNSAnswers(domain string, recordType uint16) ([]dns.RR, err
 	}
 
 	if in.MsgHdr.Truncated && s.dnsBuffer < 4096 {
-		fmt.Printf("DNS buffer %v was too small for %v, retrying with larger buffer (4096)\n", s.dnsBuffer, domain)
+		s.logger.Warn().Msg(fmt.Sprintf("DNS buffer %v was too small for %v, retrying with larger buffer (4096)", s.dnsBuffer, domain))
 
 		req.SetEdns0(4096, true)
 
@@ -77,22 +105,11 @@ func (s *Scanner) getDNSAnswers(domain string, recordType uint16) ([]dns.RR, err
 
 // GetDNSRecords is a convenience wrapper which will scan all provided DNS record types
 // and fill the pointered ScanResult. It returns an error if any occurred.
-func (s *Scanner) GetDNSRecords(scanResult *ScanResult, recordTypes ...string) (err error) {
-	var records []string
-
+func (s *Scanner) GetDNSRecords(scanResult *Result, recordTypes ...string) (err error) {
 	for _, recordType := range recordTypes {
 		switch strings.ToUpper(recordType) {
-		case "A":
-			scanResult.A, err = s.getDNSRecords(scanResult.Domain, dns.TypeA)
-		case "AAAA":
-			scanResult.AAAA, err = s.getDNSRecords(scanResult.Domain, dns.TypeAAAA)
 		case "BIMI":
 			scanResult.BIMI, err = s.getTypeBIMI(scanResult.Domain)
-		case "CNAME":
-			records, err = s.getDNSRecords(scanResult.Domain, dns.TypeCNAME)
-			if err == nil {
-				scanResult.CNAME = records[0]
-			}
 		case "DKIM":
 			scanResult.DKIM, err = s.getTypeDKIM(scanResult.Domain)
 		case "DMARC":
@@ -103,8 +120,6 @@ func (s *Scanner) GetDNSRecords(scanResult *ScanResult, recordTypes ...string) (
 			scanResult.NS, err = s.getDNSRecords(scanResult.Domain, dns.TypeNS)
 		case "SPF":
 			scanResult.SPF, err = s.getTypeSPF(scanResult.Domain)
-		case "TXT":
-			scanResult.TXT, err = s.getDNSRecords(scanResult.Domain, dns.TypeTXT)
 		default:
 			return errors.New("invalid dns record type")
 		}

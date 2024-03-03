@@ -3,14 +3,15 @@ package mail
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 
+	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/model"
 	"github.com/emersion/go-imap"
 	imapClient "github.com/emersion/go-imap/client"
-	"github.com/go-mail/mail/v2"
-	"github.com/matcornic/hermes/v2"
 	"github.com/spf13/cast"
+	"github.com/wneessen/go-mail"
 )
 
 type (
@@ -32,15 +33,6 @@ type (
 		DKIM    string
 	}
 )
-
-var MailInfo = hermes.Hermes{
-	Product: hermes.Product{
-		Copyright: "Global Cyber Alliance",
-		Name:      "Domain Security Scanner",
-		Link:      "",
-		Logo:      "https://www.globalcyberalliance.org/wp-content/uploads/Global-Cyber-Alliance-GCA-Logo-Full-Color.png",
-	},
-}
 
 // GetMail returns the most recent mail found within the logged-in user's mailbox
 func (s *Server) GetMail() (map[string]FoundMail, error) {
@@ -102,6 +94,10 @@ func (s *Server) GetMail() (map[string]FoundMail, error) {
 			dkim = strings.ReplaceAll(dkim, ";", "; ")
 		}
 
+		if len(msg.Envelope.From) == 0 {
+			continue
+		}
+
 		addresses[msg.Envelope.From[0].HostName] = FoundMail{
 			Address: msg.Envelope.From[0].Address(),
 			DKIM:    dkim,
@@ -151,38 +147,39 @@ func (s *Server) Login() (*imapClient.Client, error) {
 
 // SendMail takes a hermes.Email object, converts it into both html and plaintext,
 // and then send the email to the provided mailbox
-func (s *Server) SendMail(mailbox string, email hermes.Email) error {
-	// Generate an HTML email with the provided contents (for modern clients)
-	html, err := MailInfo.GenerateHTML(email)
+func (s *Server) SendMail(mailbox string, result model.ScanResultWithAdvice) error {
+	html, plaintext, err := s.getMailContents(result)
 	if err != nil {
 		return err
 	}
 
-	// Generate the plaintext version of the e-mail (for clients that do not support xHTML)
-	plaintext, err := MailInfo.GeneratePlainText(email)
-	if err != nil {
-		return err
+	m := mail.NewMsg()
+	m.Subject("Email Security Scan Results")
+
+	if err = m.From(s.config.Outbound.User); err != nil {
+		return fmt.Errorf("failed to set From address: %w", err)
 	}
 
-	m := mail.NewMessage()
-	m.SetHeaders(map[string][]string{
-		"From":    {s.config.Outbound.User},
-		"To":      {mailbox},
-		"Subject": {"Email Security Scan Results"},
-	})
-	m.SetBody("text/plain", plaintext)
-	m.AddAlternative("text/html", html)
+	if err = m.To(mailbox); err != nil {
+		return fmt.Errorf("failed to set To address: %w", err)
+	}
+
+	m.SetBodyString(mail.TypeTextPlain, plaintext)
+	m.SetBodyString(mail.TypeTextHTML, html)
 
 	host, port, err := net.SplitHostPort(s.config.Outbound.Host)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to split host and port: %w", err)
 	}
 
-	d := mail.NewDialer(host, cast.ToInt(port), s.config.Outbound.User, s.config.Outbound.Pass)
-	d.StartTLSPolicy = mail.MandatoryStartTLS
+	client, err := mail.NewClient(host, mail.WithPort(cast.ToInt(port)), mail.WithSMTPAuth(mail.SMTPAuthPlain),
+		mail.WithUsername(s.config.Outbound.User), mail.WithPassword(s.config.Outbound.Pass))
+	if err != nil {
+		return fmt.Errorf("failed to create mail client: %w", err)
+	}
 
-	if err = d.DialAndSend(m); err != nil {
-		return err
+	if err = client.DialAndSend(m); err != nil {
+		return fmt.Errorf("failed to send mail: %w", err)
 	}
 
 	return nil

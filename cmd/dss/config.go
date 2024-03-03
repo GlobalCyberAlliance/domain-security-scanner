@@ -1,11 +1,12 @@
 package main
 
 import (
-	"errors"
+	"os"
+	"strings"
 
 	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 func init() {
@@ -27,12 +28,12 @@ var (
 		Example: "  dss config get nameservers",
 		Args:    cobra.ExactArgs(1),
 		Run: func(command *cobra.Command, args []string) {
-			cfgVal, err := cfg.Get(args[0])
-			if err != nil {
-				log.Fatal().Err(err).Msg("could not get config")
+			switch args[0] {
+			case "nameservers":
+				printToConsole("nameservers: " + cast.ToString(cfg.Nameservers))
+			default:
+				log.Fatal().Msg("unknown config key")
 			}
-
-			printToConsole(args[0] + ": " + cast.ToString(cfgVal))
 		},
 	}
 
@@ -42,11 +43,18 @@ var (
 		Example: "  dss config set nameservers 8.8.8.8,9.9.9.9",
 		Args:    cobra.ExactArgs(2),
 		Run: func(command *cobra.Command, args []string) {
-			if err := cfg.Set(args[0], args[1]); err != nil {
-				log.Fatal().Err(err).Msg("could not set config")
+			switch args[0] {
+			case "nameservers":
+				cfg.Nameservers = strings.Split(args[1], ",")
+			default:
+				log.Fatal().Msg("unknown config key")
 			}
 
-			printToConsole("Successfully set " + args[0] + " as " + args[1])
+			if err := cfg.Save(); err != nil {
+				log.Fatal().Err(err).Msg("unable to save config")
+			}
+
+			log.Info().Msg("config updated")
 		},
 	}
 
@@ -62,25 +70,55 @@ var (
 )
 
 type Config struct {
+	dir         string
+	path        string
 	Nameservers []string `json:"nameservers" yaml:"nameservers"`
 }
 
-func (c *Config) Get(key string) (interface{}, error) {
-	switch key {
-	case "nameservers":
-		return viper.Get(key), nil
-	default:
-		return "", errors.New("invalid config key")
+func NewConfig(directory string) (*Config, error) {
+	config := Config{
+		dir:         directory,
+		path:        directory + slash + "config.yml",
+		Nameservers: []string{"8.8.8.8:53"},
 	}
+
+	if err := config.Load(); err != nil {
+		return nil, err
+	}
+
+	return &config, nil
 }
 
-func (c *Config) Set(key string, value string) error {
-	switch key {
-	case "nameservers":
-		viper.Set(key, value)
-	default:
-		return errors.New("invalid config key")
+func (c *Config) Load() error {
+	// create config if it doesn't exist
+	if _, err := os.Stat(c.path); os.IsNotExist(err) {
+		if err = os.MkdirAll(c.dir, os.ModePerm); err != nil {
+			log.Fatal().Err(err).Msg("failed to create config directory")
+		}
+
+		if err = c.Save(); err != nil {
+			return err
+		}
 	}
 
-	return viper.WriteConfig()
+	// read config
+	configData, err := os.ReadFile(c.path)
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to read config file")
+	}
+
+	if err = yaml.Unmarshal(configData, &cfg); err != nil {
+		log.Fatal().Err(err).Msg("unable to unmarshal config values")
+	}
+
+	return nil
+}
+
+func (c *Config) Save() error {
+	configData, err := yaml.Marshal(c)
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to marshal default config")
+	}
+
+	return os.WriteFile(c.path, configData, os.ModePerm)
 }

@@ -1,108 +1,105 @@
 package http
 
 import (
-	"strings"
+	"context"
+	"fmt"
+	"net/http"
 
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/model"
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/scanner"
-	"github.com/gin-gonic/gin"
+	"github.com/danielgtaylor/huma/v2"
 )
 
-type bulkDomainRequest struct {
-	Domains []string `json:"domains"`
-}
+func (s *Server) registerScanRoutes() {
+	type ScanSingleDomainRequest struct {
+		DKIMSelectors []string `query:"dkimSelectors" maxItems:"5" example:"selector1,selector2" doc:"Specify custom DKIM selectors"`
+		Domain        string   `path:"domain" maxLength:"255" example:"example.com" doc:"Domain to scan"`
+	}
 
-func (s *Server) registerScanRoutes(r *gin.RouterGroup) {
-	r.GET("/scan/:domain", s.handleScanDomains)
-	r.POST("/scan", s.handleScanDomains)
-}
+	type ScanSingleDomainResponse struct {
+		Body struct{ model.ScanResultWithAdvice }
+	}
 
-func (s *Server) handleScanDomains(c *gin.Context) {
-	var domains bulkDomainRequest
+	huma.Register(s.router, huma.Operation{
+		OperationID: "scan-domain",
+		Summary:     "Scan a single domain",
+		Method:      http.MethodGet,
+		Path:        s.apiPath + "/scan/{domain}",
+		Tags:        []string{"Scan Domains"},
+	}, func(ctx context.Context, input *ScanSingleDomainRequest) (*ScanSingleDomainResponse, error) {
+		resp := ScanSingleDomainResponse{}
 
-	switch c.Request.Method {
-	case "GET":
-		domains.Domains = []string{c.Param("domain")}
-	case "POST":
-		if err := Decode(c, &domains); err != nil {
-			s.logger.Error().Err(err).Msg("error occurred during handleScanDomains request")
-			s.respond(c, 400, "you need to supply an array of domains in the body of the request, formatted as json")
-			return
+		if len(input.DKIMSelectors) > 0 {
+			if err := s.Scanner.OverwriteOption(scanner.WithDKIMSelectors(input.DKIMSelectors...)); err != nil {
+				return nil, huma.Error500InternalServerError(err.Error())
+			}
 		}
 
-		// remove duplicate or empty domains
-		var domainMap = make(map[string]struct{})
-		var filteredDomains []string
+		results, err := s.Scanner.Scan(input.Domain)
+		if err != nil {
+			return nil, huma.Error500InternalServerError(err.Error())
+		}
 
-		for _, domain := range domains.Domains {
-			if _, ok := domainMap[domain]; ok || domain == "" {
-				continue
+		if len(results) != 1 {
+			return nil, huma.Error500InternalServerError(fmt.Errorf("expected 1 result, got %d", len(results)).Error())
+		}
+
+		result := model.ScanResultWithAdvice{
+			ScanResult: results[0],
+		}
+
+		if s.Advisor != nil && result.ScanResult.Error == "" {
+			result.Advice = s.Advisor.CheckAll(result.ScanResult.Domain, result.ScanResult.BIMI, result.ScanResult.DKIM, result.ScanResult.DMARC, result.ScanResult.MX, result.ScanResult.SPF)
+		}
+
+		resp.Body.ScanResultWithAdvice = result
+
+		return &resp, nil
+	})
+
+	type ScanBulkDomainsRequest struct {
+		DKIMSelectors []string `query:"dkimSelectors" maxItems:"5" example:"selector1,selector2" doc:"Specify custom DKIM selectors"`
+		Body          struct {
+			Domains []string `json:"domains" maxItems:"20" doc:"Domains to scan. Max 20 domains at a time." example:"example.com"`
+		}
+	}
+
+	type ScanBulkDomainResponse struct {
+		Body struct {
+			Results []model.ScanResultWithAdvice `json:"results" doc:"The results of scanning the domains."`
+		}
+	}
+
+	huma.Register(s.router, huma.Operation{
+		OperationID: "scan-domains",
+		Summary:     "Scan multiple domains",
+		Method:      http.MethodPost,
+		Path:        s.apiPath + "/scan",
+		Tags:        []string{"Scan Domains"},
+	}, func(ctx context.Context, input *ScanBulkDomainsRequest) (*ScanBulkDomainResponse, error) {
+		resp := ScanBulkDomainResponse{}
+
+		results, err := s.Scanner.Scan(input.Body.Domains...)
+		if err != nil {
+			return nil, huma.Error500InternalServerError(err.Error())
+		}
+
+		if len(results) == 0 {
+			return nil, huma.Error500InternalServerError("no results found")
+		}
+
+		for _, result := range results {
+			res := model.ScanResultWithAdvice{
+				ScanResult: result,
 			}
 
-			domainMap[domain] = struct{}{}
-			filteredDomains = append(filteredDomains, domain)
+			if s.Advisor != nil && result.Error == "" {
+				res.Advice = s.Advisor.CheckAll(result.Domain, result.BIMI, result.DKIM, result.DMARC, result.MX, result.SPF)
+			}
+
+			resp.Body.Results = append(resp.Body.Results, res)
 		}
 
-		domains.Domains = filteredDomains
-	default:
-		s.respond(c, 405, "method not allowed")
-		return
-	}
-
-	// check for empty array
-	if len(domains.Domains) == 0 {
-		s.respond(c, 400, "you need to supply an array of domains in the body of the request, formatted as json")
-		return
-	}
-
-	// mitigate potential abuse
-	if len(domains.Domains) > 20 {
-		s.respond(c, 400, "you cannot bulk process more than 20 domains at a time")
-		return
-	}
-
-	domainList := strings.NewReader(strings.Join(domains.Domains, "\n"))
-	source := scanner.NewSource(domainList, scanner.TextSourceType)
-
-	// TODO: temporary solution to allow for custom DKIM selectors in the API.
-	// This implementation is not ideal, as it will overwrite the selectors for
-	// future scans.
-	if queryParam, ok := c.GetQuery("dkimSelector"); ok {
-		if err := s.Scanner.OverwriteOption(scanner.WithDKIMSelectors(strings.Split(queryParam, ",")...)); err != nil {
-			s.logger.Error().Err(err).Msg("fai")
-			s.respond(c, 400, err.Error())
-			return
-		}
-	}
-
-	var resultsWithAdvice []model.ScanResultWithAdvice
-
-	for result := range s.Scanner.Start(source) {
-		if result.Error != "" {
-			s.respond(c, 400, result.Error)
-			return
-		}
-
-		scanResult := model.ScanResultWithAdvice{
-			ScanResult: result,
-		}
-
-		if result.Error == "" {
-			scanResult.Advice = s.Advisor.CheckAll(result.BIMI, result.DKIM, result.DMARC, result.Domain, result.MX, result.SPF, s.CheckTls)
-		}
-
-		resultsWithAdvice = append(resultsWithAdvice, scanResult)
-	}
-
-	if len(resultsWithAdvice) == 0 {
-		s.respond(c, 404, "no results found")
-		return
-	}
-
-	switch c.Request.Method {
-	case "GET":
-		s.respond(c, 200, resultsWithAdvice[0])
-	case "POST":
-		s.respond(c, 200, resultsWithAdvice)
-	}
+		return &resp, nil
+	})
 }

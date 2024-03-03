@@ -3,24 +3,42 @@ package model
 import (
 	"strings"
 
+	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/advisor"
+
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/scanner"
-	"github.com/spf13/cast"
 )
 
 type ScanResultWithAdvice struct {
-	ScanResult *scanner.ScanResult `json:"scanResult" yaml:"scanResult"`
-	Advice     map[string][]string `json:"advice,omitempty" yaml:"advice,omitempty"`
+	ScanResult *scanner.Result `json:"scanResult" yaml:"scanResult" doc:"The results of scanning a domain's DNS records."`
+	Advice     *advisor.Advice `json:"advice,omitempty" yaml:"advice,omitempty" doc:"The advice for the domain's DNS records."`
 }
 
-func (s *ScanResultWithAdvice) Csv() []string {
+func (s *ScanResultWithAdvice) CSV() []string {
 	var advice string
-	for key, v := range s.Advice {
-		for i, val := range v {
-			v[i] = " " + key + ": " + val
-		}
 
-		advice += strings.Join(v, "; ")
+	for _, value := range s.Advice.Domain {
+		advice += "Domain: " + value + "; "
 	}
 
-	return []string{s.ScanResult.Domain, strings.Join(s.ScanResult.A, "; "), strings.Join(s.ScanResult.AAAA, "; "), s.ScanResult.BIMI, s.ScanResult.CNAME, s.ScanResult.DKIM, s.ScanResult.DMARC, strings.Join(s.ScanResult.MX, "; "), s.ScanResult.SPF, strings.Join(s.ScanResult.TXT, "; "), cast.ToString(s.ScanResult.Elapsed), s.ScanResult.Error, advice}
+	for _, value := range s.Advice.BIMI {
+		advice += "BIMI: " + value + "; "
+	}
+
+	for _, value := range s.Advice.DKIM {
+		advice += "DKIM: " + value + "; "
+	}
+
+	for _, value := range s.Advice.DMARC {
+		advice += "DMARC: " + value + "; "
+	}
+
+	for _, value := range s.Advice.MX {
+		advice += "MX: " + value + "; "
+	}
+
+	for _, value := range s.Advice.SPF {
+		advice += "SPF: " + value + "; "
+	}
+
+	return []string{s.ScanResult.Domain, s.ScanResult.BIMI, s.ScanResult.DKIM, s.ScanResult.DMARC, strings.Join(s.ScanResult.MX, "; "), s.ScanResult.SPF, s.ScanResult.Error, advice}
 }
