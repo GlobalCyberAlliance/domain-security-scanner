@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/miekg/dns"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -60,17 +59,17 @@ func (s *Scanner) getDNSRecords(domain string, recordType uint16) (records []str
 			answer.Header().Rrtype = recordType
 		}
 
-		switch t := answer.(type) {
+		switch dnsRec := answer.(type) {
 		case *dns.A:
-			records = append(records, t.A.String())
+			records = append(records, dnsRec.A.String())
 		case *dns.AAAA:
-			records = append(records, t.AAAA.String())
+			records = append(records, dnsRec.AAAA.String())
 		case *dns.MX:
-			records = append(records, t.Mx)
+			records = append(records, dnsRec.Mx)
 		case *dns.NS:
-			records = append(records, t.Ns)
+			records = append(records, dnsRec.Ns)
 		case *dns.TXT:
-			records = append(records, t.Txt...)
+			records = append(records, dnsRec.Txt...)
 		}
 	}
 
@@ -81,12 +80,18 @@ func (s *Scanner) getDNSRecords(domain string, recordType uint16) (records []str
 // It returns a slice of dns.RR (DNS resource records) and an error if any occurred.
 func (s *Scanner) getDNSAnswers(domain string, recordType uint16) ([]dns.RR, error) {
 	req := &dns.Msg{}
-	req.SetQuestion(dns.Fqdn(domain), recordType)
+	req.Id = dns.Id()
+	req.RecursionDesired = true
 	req.SetEdns0(s.dnsBuffer, true) // increases the response buffer size
+	req.SetQuestion(dns.Fqdn(domain), recordType)
 
 	in, _, err := s.dnsClient.Exchange(req, s.getNS())
 	if err != nil {
 		return nil, err
+	}
+
+	if in.Rcode != dns.RcodeSuccess {
+		return nil, fmt.Errorf("DNS query failed with rcode %v", in.Rcode)
 	}
 
 	if in.MsgHdr.Truncated && s.dnsBuffer < 4096 {
@@ -101,35 +106,6 @@ func (s *Scanner) getDNSAnswers(domain string, recordType uint16) ([]dns.RR, err
 	}
 
 	return in.Answer, nil
-}
-
-// GetDNSRecords is a convenience wrapper which will scan all provided DNS record types
-// and fill the pointered ScanResult. It returns an error if any occurred.
-func (s *Scanner) GetDNSRecords(scanResult *Result, recordTypes ...string) (err error) {
-	for _, recordType := range recordTypes {
-		switch strings.ToUpper(recordType) {
-		case "BIMI":
-			scanResult.BIMI, err = s.getTypeBIMI(scanResult.Domain)
-		case "DKIM":
-			scanResult.DKIM, err = s.getTypeDKIM(scanResult.Domain)
-		case "DMARC":
-			scanResult.DMARC, err = s.getTypeDMARC(scanResult.Domain)
-		case "MX":
-			scanResult.MX, err = s.getDNSRecords(scanResult.Domain, dns.TypeMX)
-		case "NS":
-			scanResult.NS, err = s.getDNSRecords(scanResult.Domain, dns.TypeNS)
-		case "SPF":
-			scanResult.SPF, err = s.getTypeSPF(scanResult.Domain)
-		default:
-			return errors.New("invalid dns record type")
-		}
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (s *Scanner) getTypeBIMI(domain string) (string, error) {

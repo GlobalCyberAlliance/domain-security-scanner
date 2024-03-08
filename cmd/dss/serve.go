@@ -7,7 +7,6 @@ import (
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/http"
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/mail"
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/scanner"
-	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 )
 
@@ -52,6 +51,7 @@ var (
 				scanner.WithCacheDuration(cache),
 				scanner.WithConcurrentScans(concurrent),
 				scanner.WithDNSBuffer(dnsBuffer),
+				scanner.WithDNSProtocol(dnsProtocol),
 				scanner.WithNameservers(nameservers),
 			}
 
@@ -59,7 +59,7 @@ var (
 				opts = append(opts, scanner.WithDKIMSelectors(dkimSelector...))
 			}
 
-			sc, err := scanner.New(zerolog.Logger{}, timeout, opts...)
+			sc, err := scanner.New(log, timeout, opts...)
 			if err != nil {
 				log.Fatal().Err(err).Msg("could not create domain scanner")
 			}
@@ -83,6 +83,7 @@ var (
 				scanner.WithCacheDuration(cache),
 				scanner.WithConcurrentScans(concurrent),
 				scanner.WithDNSBuffer(dnsBuffer),
+				scanner.WithDNSProtocol(dnsProtocol),
 				scanner.WithNameservers(nameservers),
 			}
 
@@ -90,7 +91,7 @@ var (
 				opts = append(opts, scanner.WithDKIMSelectors(dkimSelector...))
 			}
 
-			sc, err := scanner.New(zerolog.Logger{}, timeout, opts...)
+			sc, err := scanner.New(log, timeout, opts...)
 			if err != nil {
 				log.Fatal().Err(err).Msg("could not create domain scanner")
 			}

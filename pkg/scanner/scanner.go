@@ -75,11 +75,12 @@ func New(logger zerolog.Logger, timeout time.Duration, opts ...Option) (*Scanner
 	}
 
 	dnsClient := new(dns.Client)
+	dnsClient.Net = "udp"
 	dnsClient.Timeout = timeout
 
 	scanner := &Scanner{
 		dnsClient:   dnsClient, // Initialize a new dns.Client
-		dnsBuffer:   1024,      // Set the dnsBuffer size to 1024 bytes
+		dnsBuffer:   4096,      // Set the dnsBuffer size to 1024 bytes
 		logger:      logger,
 		nameservers: []string{"8.8.8.8:53", "8.8.4.4:53", "1.1.1.1:53"}, // Set the default nameservers to Google and Cloudflare
 		poolSize:    uint16(runtime.NumCPU()),
@@ -131,13 +132,14 @@ func (s *Scanner) Scan(domains ...string) ([]*Result, error) {
 		wg.Add(1)
 
 		if err := s.pool.Submit(func() {
-			result := &Result{
-				Domain: domainToScan,
-			}
-
 			defer func() {
 				wg.Done()
 			}()
+
+			var err error
+			result := &Result{
+				Domain: domainToScan,
+			}
 
 			if s.cache != nil {
 				if scanResult, ok := s.cache.Get(domainToScan); ok {
@@ -153,15 +155,16 @@ func (s *Scanner) Scan(domains ...string) ([]*Result, error) {
 				s.logger.Debug().Msg("cache miss for " + domainToScan)
 
 				defer func() {
+					s.logger.Debug().Msg("filling cache for " + domainToScan)
 					s.cache.Set(domainToScan, result, 3*time.Minute)
 				}()
 			}
 
 			// check that the domain name is valid
-			records, err := s.getDNSAnswers(domainToScan, dns.TypeNS)
-			if err != nil || len(records) == 0 {
+			result.NS, err = s.getDNSRecords(domainToScan, dns.TypeNS)
+			if err != nil || len(result.NS) == 0 {
 				// check if TXT records exist, as the nameserver check won't work for subdomains
-				records, err = s.getDNSAnswers(domainToScan, dns.TypeTXT)
+				records, err := s.getDNSAnswers(domainToScan, dns.TypeTXT)
 				if err != nil || len(records) == 0 {
 					// fill variable to satisfy deferred cache fill
 					result = &Result{
@@ -177,9 +180,40 @@ func (s *Scanner) Scan(domains ...string) ([]*Result, error) {
 				}
 			}
 
-			if err = s.GetDNSRecords(result, "BIMI", "DKIM", "DMARC", "MX", "NS", "SPF"); err != nil {
-				result.Error = err.Error()
-			}
+			scanWg := sync.WaitGroup{}
+			scanWg.Add(5)
+
+			// Get BIMI record
+			go func() {
+				defer scanWg.Done()
+				result.BIMI, err = s.getTypeBIMI(domainToScan)
+			}()
+
+			// Get DKIM record
+			go func() {
+				defer scanWg.Done()
+				result.DKIM, err = s.getTypeDKIM(domainToScan)
+			}()
+
+			// Get DMARC record
+			go func() {
+				defer scanWg.Done()
+				result.DMARC, err = s.getTypeDMARC(domainToScan)
+			}()
+
+			// Get MX records
+			go func() {
+				defer scanWg.Done()
+				result.MX, err = s.getDNSRecords(domainToScan, dns.TypeMX)
+			}()
+
+			// Get SPF record
+			go func() {
+				defer scanWg.Done()
+				result.SPF, err = s.getTypeSPF(domainToScan)
+			}()
+
+			scanWg.Wait()
 
 			mutex.Lock()
 			results = append(results, result)

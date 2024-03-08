@@ -7,7 +7,6 @@ import (
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/advisor"
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/model"
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/scanner"
-	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 )
 
@@ -25,6 +24,7 @@ var cmdScan = &cobra.Command{
 			scanner.WithCacheDuration(cache),
 			scanner.WithConcurrentScans(concurrent),
 			scanner.WithDNSBuffer(dnsBuffer),
+			scanner.WithDNSProtocol(dnsProtocol),
 			scanner.WithNameservers(nameservers),
 		}
 
@@ -32,7 +32,7 @@ var cmdScan = &cobra.Command{
 			opts = append(opts, scanner.WithDKIMSelectors(dkimSelector...))
 		}
 
-		sc, err := scanner.New(zerolog.Logger{}, timeout, opts...)
+		sc, err := scanner.New(log, timeout, opts...)
 		if err != nil {
 			log.Fatal().Err(err).Msg("An unexpected error occurred.")
 		}

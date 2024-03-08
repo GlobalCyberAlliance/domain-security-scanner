@@ -128,6 +128,34 @@ func TestOptionWithDNSBuffer(t *testing.T) {
 	})
 }
 
+func TestOptionWithDNSProtocol(t *testing.T) {
+	logger := zerolog.Nop()
+	timeout := time.Second * 5
+
+	t.Run("InvalidProtocol", func(t *testing.T) {
+		_, err := New(logger, timeout, WithDNSProtocol("invalid_protocol"))
+		assert.Error(t, err)
+	})
+
+	t.Run("ValidProtocolTCP", func(t *testing.T) {
+		scanner, err := New(logger, timeout, WithDNSProtocol("TCP"))
+		assert.NoError(t, err)
+		assert.Equal(t, "tcp", scanner.dnsClient.Net)
+	})
+
+	t.Run("ValidProtocolTCPWithTLS", func(t *testing.T) {
+		scanner, err := New(logger, timeout, WithDNSProtocol("TCP-tls"))
+		assert.NoError(t, err)
+		assert.Equal(t, "tcp-tls", scanner.dnsClient.Net)
+	})
+
+	t.Run("ValidProtocolUDP", func(t *testing.T) {
+		scanner, err := New(logger, timeout, WithDNSProtocol("UDP"))
+		assert.NoError(t, err)
+		assert.Equal(t, "udp", scanner.dnsClient.Net)
+	})
+}
+
 func TestOptionWithNameservers(t *testing.T) {
 	logger := zerolog.Nop()
 	timeout := time.Second * 5

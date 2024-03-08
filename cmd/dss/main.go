@@ -25,7 +25,7 @@ var (
 		Use:     "dss",
 		Short:   "Scan a domain's DNS records.",
 		Long:    "Scan a domain's DNS records.\nhttps://github.com/GlobalCyberAlliance/domain-security-scanner",
-		Version: "3.0.2",
+		Version: "3.0.3",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if debug {
 				log = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).With().Timestamp().Logger().Level(zerolog.DebugLevel)
@@ -58,7 +58,7 @@ var (
 	cfg                               *Config
 	log                               zerolog.Logger
 	writeToFileCounter                int
-	format, outputFile                string
+	dnsProtocol, format, outputFile   string
 	dkimSelector, nameservers         []string
 	advise, debug, checkTLS, zoneFile bool
 	dnsBuffer                         uint16
@@ -73,7 +73,8 @@ func main() {
 	cmd.PersistentFlags().Uint16VarP(&concurrent, "concurrent", "c", uint16(runtime.NumCPU()), "The number of domains to scan concurrently")
 	cmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Print debug logs")
 	cmd.PersistentFlags().StringSliceVar(&dkimSelector, "dkimSelector", []string{}, "Specify a DKIM selector")
-	cmd.PersistentFlags().Uint16Var(&dnsBuffer, "dnsBuffer", 1024, "Specify the allocated buffer for DNS responses")
+	cmd.PersistentFlags().Uint16Var(&dnsBuffer, "dnsBuffer", 4096, "Specify the allocated buffer for DNS responses")
+	cmd.PersistentFlags().StringVar(&dnsProtocol, "dnsProtocol", "udp", "Use udp, tcp, or tcp-tls for DNS queries")
 	cmd.PersistentFlags().StringVarP(&format, "format", "f", "yaml", "Format to print results in (yaml, json)")
 	cmd.PersistentFlags().StringSliceVarP(&nameservers, "nameservers", "n", nil, "Use specific nameservers, in `host[:port]` format; may be specified multiple times")
 	cmd.PersistentFlags().StringVarP(&outputFile, "outputFile", "o", "", "Output the results to a specified file (creates a file with the current unix timestamp if no file is specified)")

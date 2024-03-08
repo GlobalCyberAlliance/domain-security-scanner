@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/netip"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/miekg/dns"
@@ -68,11 +69,27 @@ func WithDKIMSelectors(selectors ...string) Option {
 // WithDNSBuffer increases the allocated buffer for DNS responses
 func WithDNSBuffer(bufferSize uint16) Option {
 	return func(s *Scanner) error {
-		if bufferSize > 4096 {
-			s.logger.Warn().Msg("buffer size should not be larger than 4096")
+		if bufferSize <= 0 {
+			return fmt.Errorf("invalid DNS buffer size: %d", bufferSize)
 		}
 
 		s.dnsBuffer = bufferSize
+
+		return nil
+	}
+}
+
+// WithDNSProtocol sets the DNS protocol to use for queries.
+func WithDNSProtocol(protocol string) Option {
+	return func(s *Scanner) error {
+		protocol = strings.ToLower(protocol)
+
+		switch protocol {
+		case "udp", "tcp", "tcp-tls":
+			s.dnsClient.Net = protocol
+		default:
+			return fmt.Errorf("invalid DNS protocol: %s, valid options: udp, tcp, tcp-tls", protocol)
+		}
 
 		return nil
 	}

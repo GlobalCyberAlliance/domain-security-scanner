@@ -69,53 +69,44 @@ func NewAdvisor(timeout time.Duration, cacheLifetime time.Duration, checkTLS boo
 	return &advisor
 }
 
-func (a *Advisor) CheckAll(domain string, bimi string, dkim string, dmarc string, mx []string, spf string) *Advice {
-	var adviceDomain, adviceBIMI, adviceDKIM, adviceDMARC, adviceMX, adviceSPF []string
+func (a *Advisor) CheckAll(domain, bimi, dkim, dmarc string, mx []string, spf string) *Advice {
+	advice := &Advice{}
 	var wg sync.WaitGroup
 
 	wg.Add(6)
 	go func() {
-		adviceDomain = a.CheckDomain(domain)
+		advice.Domain = a.CheckDomain(domain)
 		wg.Done()
 	}()
 
 	go func() {
-		adviceBIMI = a.CheckBIMI(bimi)
+		advice.BIMI = a.CheckBIMI(bimi)
 		wg.Done()
 	}()
 
 	go func() {
-		adviceDKIM = a.CheckDKIM(dkim)
+		advice.DKIM = a.CheckDKIM(dkim)
 		wg.Done()
 	}()
 
 	go func() {
-		adviceDMARC = a.CheckDMARC(dmarc)
+		advice.DMARC = a.CheckDMARC(dmarc)
 		wg.Done()
 	}()
 
 	go func() {
-		adviceMX = a.CheckMX(mx)
+		advice.MX = a.CheckMX(mx)
 		wg.Done()
 	}()
 
 	go func() {
-		adviceSPF = a.CheckSPF(spf)
+		advice.SPF = a.CheckSPF(spf)
 		wg.Done()
 	}()
 
 	wg.Wait()
 
-	advice := Advice{
-		Domain: adviceDomain,
-		BIMI:   adviceBIMI,
-		DKIM:   adviceDKIM,
-		DMARC:  adviceDMARC,
-		MX:     adviceMX,
-		SPF:    adviceSPF,
-	}
-
-	return &advice
+	return advice
 }
 
 func (a *Advisor) CheckBIMI(bimi string) (advice []string) {
