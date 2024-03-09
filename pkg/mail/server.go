@@ -7,9 +7,9 @@ import (
 	"time"
 
 	domainAdvisor "github.com/GlobalCyberAlliance/domain-security-scanner/pkg/advisor"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/cache"
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/model"
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/scanner"
-	"github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cast"
@@ -18,7 +18,7 @@ import (
 type Server struct {
 	advisor      *domainAdvisor.Advisor
 	config       Config
-	cooldown     *cache.Cache
+	cooldown     *cache.Cache[string]
 	interval     time.Duration
 	logger       zerolog.Logger
 	templateHtml *htmlTmpl.Template
@@ -32,7 +32,7 @@ func NewMailServer(config Config, logger zerolog.Logger, sc *scanner.Scanner, ad
 	s := Server{
 		advisor:  advisor,
 		config:   config,
-		cooldown: cache.New(1*time.Minute, 5*time.Minute),
+		cooldown: cache.New[string](1 * time.Minute),
 		logger:   logger,
 		Scanner:  sc,
 	}
@@ -76,11 +76,12 @@ func (s *Server) handler() error {
 
 			var domainList []string
 			for domain := range addresses {
-				if _, ok := s.cooldown.Get(domain); ok {
+				cooldownDomain := s.cooldown.Get(domain)
+				if cooldownDomain != nil {
 					continue
 				}
 
-				s.cooldown.Set(domain, "", 1*time.Minute)
+				s.cooldown.Set(domain, &domain)
 
 				domainList = append(domainList, domain)
 			}

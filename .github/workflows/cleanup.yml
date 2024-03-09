@@ -1,22 +1,27 @@
 name: Cleanup
-
-on: [pull_request]
+on: pull_request
 
 jobs:
   prettier:
     runs-on: ubuntu-latest
+    permissions:
+      # Give the default GITHUB_TOKEN write permission to commit and push the
+      # added or changed files to the repository.
+      contents: write
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
-          # Make sure the actual branch is checked out when running on pull requests
-          ref: ${{ github.head_ref }}
-          # This is important to fetch the changes to the previous commit
-          fetch-depth: 0
+          go-version: '^1.22.0' # The Go version to download (if necessary) and use.
+
+      - name: Install gofumpt
+        run: go install mvdan.cc/gofumpt@latest
 
       - name: Format code
-        uses: iamnotaturtle/auto-gofmt@v2.1.0
+        run: gofumpt -w .
+
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          # This part is also where you can pass other options, for example:
-          only_changed: True
+          commit_message: Apply gofumpt formatting

@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/advisor"
@@ -10,6 +11,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/go-chi/httprate"
 	"github.com/goccy/go-json"
@@ -46,6 +48,7 @@ func NewServer(logger zerolog.Logger, version string) *Server {
 	config.OpenAPIPath = "/api/v1/docs"
 
 	mux := chi.NewMux()
+	mux.Use(middleware.RedirectSlashes, middleware.RealIP, handleLogging(&logger), middleware.Recoverer)
 	mux.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST"},
@@ -54,7 +57,7 @@ func NewServer(logger zerolog.Logger, version string) *Server {
 		AllowCredentials: false,
 		MaxAge:           300, // Maximum value not ignored by any of major browsers
 	}))
-	mux.Use(httprate.Limit(3, 3*time.Second,
+	mux.Use(httprate.Limit(5, 3*time.Second,
 		httprate.WithLimitHandler(func(w http.ResponseWriter, r *http.Request) {
 			response, err := json.Marshal(huma.Error429TooManyRequests("try again later"))
 			if err != nil {
@@ -123,4 +126,37 @@ func (s *Server) registerVersionRoute(version string) {
 		resp.Body.Version = version
 		return &resp, nil
 	})
+}
+
+func handleLogging(logger *zerolog.Logger) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			wrappedWriter := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+			startTime := time.Now()
+
+			defer func() {
+				if rec := recover(); rec != nil {
+					logger.Error().
+						Str("type", "error").
+						Timestamp().
+						Interface("recover_info", rec).
+						Bytes("debug_stack", debug.Stack()).
+						Msg("system error")
+					http.Error(wrappedWriter, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				}
+
+				logger.Info().
+					Timestamp().
+					Fields(map[string]interface{}{
+						"ip":      r.RemoteAddr,
+						"method":  r.Method,
+						"url":     r.URL.Path,
+						"status":  wrappedWriter.Status(),
+						"latency": time.Since(startTime).Round(time.Millisecond).String(),
+					}).Msg("request")
+			}()
+
+			next.ServeHTTP(wrappedWriter, r)
+		})
+	}
 }

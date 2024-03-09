@@ -9,9 +9,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/cache"
 	"github.com/miekg/dns"
 	"github.com/panjf2000/ants/v2"
-	"github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cast"
@@ -20,7 +20,7 @@ import (
 type (
 	Scanner struct {
 		// cache is a simple in-memory cache to reduce external requests from the scanner.
-		cache *cache.Cache
+		cache *cache.Cache[Result]
 
 		// cacheDuration is the time-to-live for cache entries.
 		cacheDuration time.Duration
@@ -93,7 +93,7 @@ func New(logger zerolog.Logger, timeout time.Duration, opts ...Option) (*Scanner
 	}
 
 	// Initialize cache
-	scanner.cache = cache.New(scanner.cacheDuration, 5*time.Minute)
+	scanner.cache = cache.New[Result](scanner.cacheDuration)
 
 	// Create a new pool of workers for the scanner
 	pool, err := ants.NewPool(int(scanner.poolSize), ants.WithExpiryDuration(timeout), ants.WithPanicHandler(func(err interface{}) {
@@ -142,21 +142,19 @@ func (s *Scanner) Scan(domains ...string) ([]*Result, error) {
 			}
 
 			if s.cache != nil {
-				if scanResult, ok := s.cache.Get(domainToScan); ok {
+				scanResult := s.cache.Get(domainToScan)
+				if scanResult != nil {
 					s.logger.Debug().Msg("cache hit for " + domainToScan)
-
 					mutex.Lock()
-					results = append(results, scanResult.(*Result))
+					results = append(results, scanResult)
 					mutex.Unlock()
-
 					return
 				}
 
 				s.logger.Debug().Msg("cache miss for " + domainToScan)
 
 				defer func() {
-					s.logger.Debug().Msg("filling cache for " + domainToScan)
-					s.cache.Set(domainToScan, result, 3*time.Minute)
+					s.cache.Set(domainToScan, result)
 				}()
 			}
 

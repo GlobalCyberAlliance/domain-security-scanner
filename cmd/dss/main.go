@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
+	"io"
 	"os"
 	"runtime"
 	"strings"
@@ -25,12 +26,20 @@ var (
 		Use:     "dss",
 		Short:   "Scan a domain's DNS records.",
 		Long:    "Scan a domain's DNS records.\nhttps://github.com/GlobalCyberAlliance/domain-security-scanner",
-		Version: "3.0.3",
+		Version: "3.0.4",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			if debug {
-				log = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).With().Timestamp().Logger().Level(zerolog.DebugLevel)
+			var logWriter io.Writer
+
+			if prettyLog {
+				logWriter = zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
 			} else {
-				log = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).With().Timestamp().Logger().Level(zerolog.InfoLevel)
+				logWriter = os.Stdout
+			}
+
+			if debug {
+				log = zerolog.New(logWriter).With().Timestamp().Logger().Level(zerolog.DebugLevel)
+			} else {
+				log = zerolog.New(logWriter).With().Timestamp().Logger().Level(zerolog.InfoLevel)
 			}
 
 			configDir, err := os.UserHomeDir()
@@ -55,15 +64,15 @@ var (
 		},
 	}
 
-	cfg                               *Config
-	log                               zerolog.Logger
-	writeToFileCounter                int
-	dnsProtocol, format, outputFile   string
-	dkimSelector, nameservers         []string
-	advise, debug, checkTLS, zoneFile bool
-	dnsBuffer                         uint16
-	cache, timeout                    time.Duration
-	concurrent                        uint16
+	cfg                                          *Config
+	log                                          zerolog.Logger
+	writeToFileCounter                           int
+	dnsProtocol, format, outputFile              string
+	dkimSelector, nameservers                    []string
+	advise, debug, checkTLS, prettyLog, zoneFile bool
+	dnsBuffer                                    uint16
+	cache, timeout                               time.Duration
+	concurrent                                   uint16
 )
 
 func main() {
@@ -74,10 +83,11 @@ func main() {
 	cmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Print debug logs")
 	cmd.PersistentFlags().StringSliceVar(&dkimSelector, "dkimSelector", []string{}, "Specify a DKIM selector")
 	cmd.PersistentFlags().Uint16Var(&dnsBuffer, "dnsBuffer", 4096, "Specify the allocated buffer for DNS responses")
-	cmd.PersistentFlags().StringVar(&dnsProtocol, "dnsProtocol", "udp", "Use udp, tcp, or tcp-tls for DNS queries")
+	cmd.PersistentFlags().StringVar(&dnsProtocol, "dnsProtocol", "udp", "Protocol to use for DNS queries (udp, tcp, tcp-tls)")
 	cmd.PersistentFlags().StringVarP(&format, "format", "f", "yaml", "Format to print results in (yaml, json)")
 	cmd.PersistentFlags().StringSliceVarP(&nameservers, "nameservers", "n", nil, "Use specific nameservers, in `host[:port]` format; may be specified multiple times")
 	cmd.PersistentFlags().StringVarP(&outputFile, "outputFile", "o", "", "Output the results to a specified file (creates a file with the current unix timestamp if no file is specified)")
+	cmd.PersistentFlags().BoolVar(&prettyLog, "prettyLog", true, "Pretty print logs to console")
 	cmd.PersistentFlags().DurationVarP(&timeout, "timeout", "t", 15*time.Second, "Timeout duration for queries")
 	cmd.PersistentFlags().BoolVarP(&zoneFile, "zoneFile", "z", false, "Input file/pipe containing an RFC 1035 zone file")
 

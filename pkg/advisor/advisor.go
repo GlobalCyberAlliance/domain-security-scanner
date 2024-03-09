@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/patrickmn/go-cache"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/cache"
 	"github.com/spf13/cast"
 )
 
@@ -22,8 +22,8 @@ type (
 		consumerDomains      map[string]struct{}
 		consumerDomainsMutex *sync.Mutex
 		dialer               *net.Dialer
-		tlsCacheHost         *cache.Cache
-		tlsCacheMail         *cache.Cache
+		tlsCacheHost         *cache.Cache[[]string]
+		tlsCacheMail         *cache.Cache[[]string]
 		checkTLS             bool
 	}
 
@@ -58,8 +58,8 @@ func NewAdvisor(timeout time.Duration, cacheLifetime time.Duration, checkTLS boo
 		consumerDomains:      make(map[string]struct{}),
 		consumerDomainsMutex: &sync.Mutex{},
 		dialer:               &net.Dialer{Timeout: timeout},
-		tlsCacheHost:         cache.New(cacheLifetime, 5*time.Minute),
-		tlsCacheMail:         cache.New(cacheLifetime, 5*time.Minute),
+		tlsCacheHost:         cache.New[[]string](cacheLifetime),
+		tlsCacheMail:         cache.New[[]string](cacheLifetime),
 	}
 
 	for _, domain := range consumerDomainList {
@@ -445,13 +445,14 @@ func (a *Advisor) checkHostTls(hostname string, port int) (advice []string) {
 	}
 
 	// check if the advice is already in the cache
-	if tlsAdvice, ok := a.tlsCacheHost.Get(hostname); ok {
-		return tlsAdvice.([]string)
+	tlsAdvice := a.tlsCacheHost.Get(hostname)
+	if tlsAdvice != nil {
+		return *tlsAdvice
 	}
 
 	// set the advice in the cache after the function returns
 	defer func() {
-		a.tlsCacheHost.Set(hostname, advice, 3*time.Minute)
+		a.tlsCacheHost.Set(hostname, &advice)
 	}()
 
 	if port == 0 {
@@ -491,13 +492,14 @@ func (a *Advisor) checkMailTls(hostname string) (advice []string) {
 	}
 
 	// check if the advice is already in the cache
-	if tlsAdvice, ok := a.tlsCacheMail.Get(hostname); ok {
-		return tlsAdvice.([]string)
+	tlsAdvice := a.tlsCacheMail.Get(hostname)
+	if tlsAdvice != nil {
+		return *tlsAdvice
 	}
 
 	// set the advice in the cache after the function returns
 	defer func() {
-		a.tlsCacheMail.Set(hostname, advice, 3*time.Minute)
+		a.tlsCacheMail.Set(hostname, &advice)
 	}()
 
 	conn, err := a.dialer.Dial("tcp", hostname+":25")

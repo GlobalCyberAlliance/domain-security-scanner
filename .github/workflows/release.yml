@@ -1,18 +1,20 @@
 name: Release
-on: push
+on:
+  release:
+    types: [published]
 
 jobs:
   build:
-    name: Build and Release
+    name: Build and Release Binaries
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@master
+        uses: actions/checkout@v4
 
       - name: Setup Go Environment
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
-          go-version: '^1.20.0'
+          go-version: '^1.22.0'
 
       - name: Build Binaries
         run: |
@@ -22,7 +24,45 @@ jobs:
           gox --output "../../builds/dss-{{.OS}}-{{.Arch}}" -ldflags '-s -w' -osarch 'darwin/amd64 darwin/arm64 linux/amd64 linux/arm freebsd/amd64 windows/amd64'
           cd ../../builds
           find . -maxdepth 1 -type f -execdir zip 'compressed/{}.zip' '{}' \;
+
       - name: Upload Binaries
         run: |
           go install github.com/tcnksm/ghr@latest
           ghr -t ${{ secrets.GITHUB_TOKEN }} --delete Latest builds/compressed/
+  docker:
+    name: Build and Release Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Setup Image Name
+        run: |
+          echo "IMAGE_ID=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
+
+      - name: Login to GitHub Packages
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          images: |
+            ghcr.io/${{ env.IMAGE_ID }}
+          tags: |
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
+          flavor: |
+            latest=true
+
+      - name: Build and Push to GitHub Packages
+        id: docker_build
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
