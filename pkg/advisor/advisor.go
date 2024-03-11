@@ -36,7 +36,7 @@ type (
 		SPF    []string `json:"spf,omitempty" yaml:"spf,omitempty" doc:"SPF advice." example:"SPF seems to be setup correctly! No further action needed."`
 	}
 
-	// dmarc represents the structure of a DMARC record
+	// dmarc represents the structure of a DMARC record.
 	dmarc struct {
 		Version                    string
 		Policy                     string
@@ -137,7 +137,7 @@ func (a *Advisor) CheckBIMI(bimi string) (advice []string) {
 				}
 				defer response.Body.Close()
 
-				if response.StatusCode != 200 {
+				if response.StatusCode != http.StatusOK {
 					advice = append(advice, "Your SVG logo could not be downloaded.")
 					continue
 				}
@@ -159,7 +159,7 @@ func (a *Advisor) CheckBIMI(bimi string) (advice []string) {
 				}
 				defer response.Body.Close()
 
-				if response.StatusCode != 200 {
+				if response.StatusCode != http.StatusOK {
 					advice = append(advice, "Your VMC certificate could not be downloaded.")
 					continue
 				}
@@ -369,7 +369,7 @@ func (a *Advisor) CheckDomain(domain string) (advice []string) {
 	a.consumerDomainsMutex.Unlock()
 
 	if a.checkTLS {
-		advice = append(advice, a.checkHostTls(domain, 443)...)
+		advice = append(advice, a.checkHostTLS(domain, 443)...)
 	}
 
 	if len(advice) == 0 {
@@ -422,7 +422,7 @@ func (a *Advisor) CheckMX(mx []string) (advice []string) {
 	return advice
 }
 
-func (a *Advisor) CheckSPF(spf string) (advice []string) {
+func (a *Advisor) CheckSPF(spf string) []string {
 	if spf == "" {
 		return []string{"We couldn't detect any active SPF record for your domain. Please visit https://dmarcguide.globalcyberalliance.org to fix this."}
 	}
@@ -438,7 +438,7 @@ func (a *Advisor) CheckSPF(spf string) (advice []string) {
 	return []string{"SPF seems to be setup correctly! No further action needed."}
 }
 
-func (a *Advisor) checkHostTls(hostname string, port int) (advice []string) {
+func (a *Advisor) checkHostTLS(hostname string, port int) (advice []string) {
 	// strip the trailing dot from DNS records
 	if string(hostname[len(hostname)-1]) == "." {
 		hostname = hostname[:len(hostname)-1]
@@ -531,7 +531,7 @@ func (a *Advisor) checkMailTls(hostname string) (advice []string) {
 		if strings.Contains(err.Error(), "certificate is not trusted") || strings.Contains(err.Error(), "failed to verify certificate") {
 			advice = append(advice, "No valid certificate could be found.")
 
-			// close the existing connection and create a new one as we can't reuse it in the same way as the checkHostTls function
+			// close the existing connection and create a new one as we can't reuse it in the same way as the checkHostTLS function
 			if err = conn.Close(); err != nil {
 				// fill variable to satisfy deferred cache fill
 				advice = append(advice, "Failed to re-attempt connection without certificate verification")
@@ -590,7 +590,7 @@ func checkTLSVersion(tlsVersion uint16) string {
 }
 
 func validateEmail(email string) bool {
-	if len(email) < 3 && len(email) > 254 {
+	if len(email) < 3 || len(email) > 254 {
 		return false
 	}
 	return emailRegex.MatchString(email)

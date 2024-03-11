@@ -2,7 +2,7 @@ PROJECT			 := github.com/GlobalCyberAlliance/domain-security-scanner
 GO				 := $(shell which go 2>/dev/null)
 GOFIELDALIGNMENT := $(shell which fieldalignment 2>/dev/null)
 GOFUMPT			 := $(shell which gofumpt 2>/dev/null)
-GOLINTER		 := $(shell which staticcheck 2>/dev/null)
+GOLINTER		 := $(shell which golangci-lint 2>/dev/null)
 GONILAWAY        := $(shell which nilaway 2>/dev/null)
 GO_BENCH_FLAGS	 := -short -bench=. -benchmem
 GO_BENCH		 := $(GO) test $(GO_BENCH_FLAGS)
@@ -50,11 +50,11 @@ format:
 
 lint:
 	@if [ -z "${GOLINTER}" ]; then \
-		echo "Cannot find 'staticcheck' in your $$PATH"; \
+		echo "Cannot find 'golangci-lint' in your $$PATH"; \
 		exit 1; \
 	fi
 	@echo "Running linter..."
-	@$(GOLINTER) ./...
+	@$(GOLINTER) run ./...
 
 nil:
 	@if [ -z "${GONILAWAY}" ]; then \

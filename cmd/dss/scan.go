@@ -59,7 +59,7 @@ var cmdScan = &cobra.Command{
 
 			for scanner.Scan() {
 				domain := scanner.Text()
-				results, err := sc.Scan(domain)
+				results, err = sc.Scan(domain)
 				if err != nil {
 					log.Fatal().Err(err).Msg("An unexpected error occurred.")
 				}
@@ -69,7 +69,7 @@ var cmdScan = &cobra.Command{
 				}
 			}
 
-			if err := scanner.Err(); err != nil {
+			if err = scanner.Err(); err != nil {
 				log.Fatal().Err(err).Msg("An error occurred while reading from stdin.")
 			}
 		} else {

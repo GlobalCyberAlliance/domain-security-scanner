@@ -212,7 +212,7 @@ You can then email this inbox from any address, and you'll receive an email back
 | `--format`       | `-f`  | Format to print results in (yaml, json, csv) (default "yaml")                                                   |
 | `--nameservers`  | `-n`  | Use specific nameservers, in host[:port] format; may be specified multiple times                                |
 | `--outputFile`   | `-o`  | Output the results to a specified file (creates a file with the current unix timestamp if no file is specified) |
-| `--prettyLog`    | `-p`  | Pretty print logs to console (default true)                                                                     |
+| `--prettyLog`    |       | Pretty print logs to console (default true)                                                                     |
 | `--timeout`      | `-t`  | Timeout duration for a DNS query (default 15s)                                                                  |
 | `--zoneFile`     | `-z`  | Input file/pipe containing an RFC 1035 zone file                                                                |
 

@@ -25,7 +25,7 @@ func (s *Server) initializeTemplates() error {
 		return fmt.Errorf("failed to read html template: %w", err)
 	}
 
-	templateHtml, err := htmlTmpl.New("html").Parse(string(htmlTemplate))
+	templateHTML, err := htmlTmpl.New("html").Parse(string(htmlTemplate))
 	if err != nil {
 		return fmt.Errorf("failed to parse html template: %w", err)
 	}
@@ -40,7 +40,7 @@ func (s *Server) initializeTemplates() error {
 		return fmt.Errorf("failed to parse txt template: %w", err)
 	}
 
-	s.templateHtml = templateHtml
+	s.templateHTML = templateHTML
 	s.templateText = templateText
 
 	return nil
@@ -76,7 +76,7 @@ func (s *Server) getMailContents(result model.ScanResultWithAdvice) (string, str
 		result.Advice = &advisor.Advice{}
 	}
 
-	if err := s.templateHtml.Execute(&htmlBytes, mailData); err != nil {
+	if err := s.templateHTML.Execute(&htmlBytes, mailData); err != nil {
 		return "", "", fmt.Errorf("failed to execute html template: %w", err)
 	}
 

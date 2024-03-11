@@ -65,7 +65,7 @@ type (
 		DMARC  string   `json:"dmarc,omitempty" yaml:"dmarc,omitempty" doc:"The DMARC record for the domain." example:"v=DMARC1; p=none"`
 		MX     []string `json:"mx,omitempty" yaml:"mx,omitempty" doc:"The MX records for the domain." example:"aspmx.l.google.com"`
 		NS     []string `json:"ns,omitempty" yaml:"ns,omitempty" doc:"The NS records for the domain." example:"ns1.example.com"`
-		SPF    string   `json:"spf,omitempty" yaml:"spf,omitempty" doc:"The SPF record for the domain."example:"v=spf1 include:_spf.google.com ~all"`
+		SPF    string   `json:"spf,omitempty" yaml:"spf,omitempty" doc:"The SPF record for the domain." example:"v=spf1 include:_spf.google.com ~all"`
 	}
 )
 
@@ -111,7 +111,7 @@ func New(logger zerolog.Logger, timeout time.Duration, opts ...Option) (*Scanner
 // Scan scans a list of domains and returns the results.
 func (s *Scanner) Scan(domains ...string) ([]*Result, error) {
 	if s.pool == nil {
-		return nil, fmt.Errorf("scanner is closed")
+		return nil, errors.New("scanner is closed")
 	}
 
 	for _, domain := range domains {
@@ -178,6 +178,7 @@ func (s *Scanner) Scan(domains ...string) ([]*Result, error) {
 				}
 			}
 
+			var errs []string
 			scanWg := sync.WaitGroup{}
 			scanWg.Add(5)
 
@@ -185,33 +186,52 @@ func (s *Scanner) Scan(domains ...string) ([]*Result, error) {
 			go func() {
 				defer scanWg.Done()
 				result.BIMI, err = s.getTypeBIMI(domainToScan)
+				if err != nil {
+					errs = append(errs, "bimi:"+err.Error())
+				}
 			}()
 
 			// Get DKIM record
 			go func() {
 				defer scanWg.Done()
 				result.DKIM, err = s.getTypeDKIM(domainToScan)
+				if err != nil {
+					errs = append(errs, "dkim:"+err.Error())
+				}
 			}()
 
 			// Get DMARC record
 			go func() {
 				defer scanWg.Done()
 				result.DMARC, err = s.getTypeDMARC(domainToScan)
+				if err != nil {
+					errs = append(errs, "dmarc:"+err.Error())
+				}
 			}()
 
 			// Get MX records
 			go func() {
 				defer scanWg.Done()
 				result.MX, err = s.getDNSRecords(domainToScan, dns.TypeMX)
+				if err != nil {
+					errs = append(errs, "mx:"+err.Error())
+				}
 			}()
 
 			// Get SPF record
 			go func() {
 				defer scanWg.Done()
 				result.SPF, err = s.getTypeSPF(domainToScan)
+				if err != nil {
+					errs = append(errs, "spf:"+err.Error())
+				}
 			}()
 
 			scanWg.Wait()
+
+			if len(errs) > 0 {
+				result.Error = strings.Join(errs, ", ")
+			}
 
 			mutex.Lock()
 			results = append(results, result)
@@ -228,7 +248,7 @@ func (s *Scanner) Scan(domains ...string) ([]*Result, error) {
 
 func (s *Scanner) ScanZone(zone io.Reader) ([]*Result, error) {
 	if s.pool == nil {
-		return nil, fmt.Errorf("scanner is closed")
+		return nil, errors.New("scanner is closed")
 	}
 
 	zoneParser := dns.NewZoneParser(zone, "", "")

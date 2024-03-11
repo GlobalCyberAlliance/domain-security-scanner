@@ -18,7 +18,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// support OS-specific path separators
+// support OS-specific path separators.
 const slash = string(os.PathSeparator)
 
 var (
@@ -26,7 +26,7 @@ var (
 		Use:     "dss",
 		Short:   "Scan a domain's DNS records.",
 		Long:    "Scan a domain's DNS records.\nhttps://github.com/GlobalCyberAlliance/domain-security-scanner",
-		Version: "3.0.4",
+		Version: "3.0.5",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			var logWriter io.Writer
 

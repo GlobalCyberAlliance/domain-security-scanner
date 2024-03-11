@@ -21,13 +21,13 @@ type Server struct {
 	cooldown     *cache.Cache[string]
 	interval     time.Duration
 	logger       zerolog.Logger
-	templateHtml *htmlTmpl.Template
+	templateHTML *htmlTmpl.Template
 	templateText *textTmpl.Template
-	CheckTls     bool
+	CheckTLS     bool
 	Scanner      *scanner.Scanner
 }
 
-// NewMailServer returns a new instance of a mail server
+// NewMailServer returns a new instance of a mail server.
 func NewMailServer(config Config, logger zerolog.Logger, sc *scanner.Scanner, advisor *domainAdvisor.Advisor) (*Server, error) {
 	s := Server{
 		advisor:  advisor,

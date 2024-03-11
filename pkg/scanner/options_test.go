@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOptionOverwrite(t *testing.T) {
@@ -15,18 +15,18 @@ func TestOptionOverwrite(t *testing.T) {
 
 	t.Run("ValidOverwrite", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithCacheDuration(0))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = scanner.OverwriteOption(WithCacheDuration(time.Second * 10))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("InvalidOverwrite", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithCacheDuration(0))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = scanner.OverwriteOption(nil)
-		assert.ErrorContains(t, err, "invalid option")
+		require.ErrorContains(t, err, "invalid option")
 	})
 }
 
@@ -36,14 +36,14 @@ func TestOptionWithCacheDuration(t *testing.T) {
 
 	t.Run("ValidCacheDuration", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithCacheDuration(time.Second*10))
-		assert.NoError(t, err)
-		assert.Equal(t, time.Second*10, scanner.cacheDuration)
+		require.NoError(t, err)
+		require.Equal(t, time.Second*10, scanner.cacheDuration)
 	})
 
 	t.Run("ZeroCacheDuration", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithCacheDuration(0))
-		assert.NoError(t, err)
-		assert.Equal(t, time.Duration(0), scanner.cacheDuration)
+		require.NoError(t, err)
+		require.Equal(t, time.Duration(0), scanner.cacheDuration)
 	})
 }
 
@@ -53,14 +53,14 @@ func TestOptionWithConcurrentScans(t *testing.T) {
 
 	t.Run("ValidConcurrentScans", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithConcurrentScans(5))
-		assert.NoError(t, err)
-		assert.Equal(t, uint16(5), scanner.poolSize)
+		require.NoError(t, err)
+		require.Equal(t, uint16(5), scanner.poolSize)
 	})
 
 	t.Run("ZeroConcurrentScans", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithConcurrentScans(0))
-		assert.NoError(t, err)
-		assert.Equal(t, uint16(runtime.NumCPU()), scanner.poolSize)
+		require.NoError(t, err)
+		require.Equal(t, uint16(runtime.NumCPU()), scanner.poolSize)
 	})
 }
 
@@ -70,38 +70,38 @@ func TestOptionWithDKIMSelectors(t *testing.T) {
 
 	t.Run("ValidDKIMSelectors", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithDKIMSelectors("selector1", "selector1._google"))
-		assert.NoError(t, err)
-		assert.Equal(t, []string{"selector1", "selector1._google"}, scanner.dkimSelectors)
+		require.NoError(t, err)
+		require.Equal(t, []string{"selector1", "selector1._google"}, scanner.dkimSelectors)
 	})
 
 	t.Run("InvalidDKIMSelectorEndingCharacter", func(t *testing.T) {
 		_, err := New(logger, timeout, WithDKIMSelectors("selector1."))
-		assert.ErrorContains(t, err, "should not end with '.'")
+		require.ErrorContains(t, err, "should not end with '.'")
 	})
 
 	t.Run("InvalidDKIMSelectorStartingCharacter", func(t *testing.T) {
 		_, err := New(logger, timeout, WithDKIMSelectors(".selector1"))
-		assert.ErrorContains(t, err, "should not start with '.'")
+		require.ErrorContains(t, err, "should not start with '.'")
 	})
 
 	t.Run("InvalidDKIMSelectorCharacter", func(t *testing.T) {
 		_, err := New(logger, timeout, WithDKIMSelectors("selector1@"))
-		assert.ErrorContains(t, err, "DKIM selector has invalid character '@'")
+		require.ErrorContains(t, err, "DKIM selector has invalid character '@'")
 	})
 
 	t.Run("InvalidDKIMSelectorLength", func(t *testing.T) {
 		_, err := New(logger, timeout, WithDKIMSelectors("an_unnecessarily_long_and_invalid_dkim_selector_that_is_64_chars"))
-		assert.ErrorContains(t, err, "can't exceed 63")
+		require.ErrorContains(t, err, "can't exceed 63")
 	})
 
 	t.Run("EmptyDKIMSelector", func(t *testing.T) {
 		_, err := New(logger, timeout, WithDKIMSelectors(""))
-		assert.ErrorContains(t, err, "DKIM selector is empty")
+		require.ErrorContains(t, err, "DKIM selector is empty")
 	})
 
 	t.Run("NilDKIMSelectors", func(t *testing.T) {
 		_, err := New(logger, timeout, WithDKIMSelectors())
-		assert.ErrorContains(t, err, "no DKIM selectors provided")
+		require.ErrorContains(t, err, "no DKIM selectors provided")
 	})
 }
 
@@ -111,20 +111,20 @@ func TestOptionWithDNSBuffer(t *testing.T) {
 
 	t.Run("BufferWithinLimit", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithDNSBuffer(2048))
-		assert.NoError(t, err)
-		assert.Equal(t, uint16(2048), scanner.dnsBuffer)
+		require.NoError(t, err)
+		require.Equal(t, uint16(2048), scanner.dnsBuffer)
 	})
 
 	t.Run("BufferExceedsLimit", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithDNSBuffer(5000))
-		assert.NoError(t, err)
-		assert.Equal(t, uint16(5000), scanner.dnsBuffer)
+		require.NoError(t, err)
+		require.Equal(t, uint16(5000), scanner.dnsBuffer)
 	})
 
 	t.Run("BufferAtLimit", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithDNSBuffer(4096))
-		assert.NoError(t, err)
-		assert.Equal(t, uint16(4096), scanner.dnsBuffer)
+		require.NoError(t, err)
+		require.Equal(t, uint16(4096), scanner.dnsBuffer)
 	})
 }
 
@@ -134,25 +134,25 @@ func TestOptionWithDNSProtocol(t *testing.T) {
 
 	t.Run("InvalidProtocol", func(t *testing.T) {
 		_, err := New(logger, timeout, WithDNSProtocol("invalid_protocol"))
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("ValidProtocolTCP", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithDNSProtocol("TCP"))
-		assert.NoError(t, err)
-		assert.Equal(t, "tcp", scanner.dnsClient.Net)
+		require.NoError(t, err)
+		require.Equal(t, "tcp", scanner.dnsClient.Net)
 	})
 
 	t.Run("ValidProtocolTCPWithTLS", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithDNSProtocol("TCP-tls"))
-		assert.NoError(t, err)
-		assert.Equal(t, "tcp-tls", scanner.dnsClient.Net)
+		require.NoError(t, err)
+		require.Equal(t, "tcp-tls", scanner.dnsClient.Net)
 	})
 
 	t.Run("ValidProtocolUDP", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithDNSProtocol("UDP"))
-		assert.NoError(t, err)
-		assert.Equal(t, "udp", scanner.dnsClient.Net)
+		require.NoError(t, err)
+		require.Equal(t, "udp", scanner.dnsClient.Net)
 	})
 }
 
@@ -162,36 +162,36 @@ func TestOptionWithNameservers(t *testing.T) {
 
 	t.Run("EmptyNameservers", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithNameservers(nil))
-		assert.NoError(t, err)
-		assert.NotEmpty(t, scanner.nameservers)
+		require.NoError(t, err)
+		require.NotEmpty(t, scanner.nameservers)
 	})
 
 	t.Run("InvalidNameservers", func(t *testing.T) {
 		_, err := New(logger, timeout, WithNameservers([]string{"invalid_nameserver"}))
-		assert.ErrorContains(t, err, "invalid IP address")
+		require.ErrorContains(t, err, "invalid IP address")
 	})
 
 	t.Run("ValidNameserverWithPort", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithNameservers([]string{"8.8.8.8:53"}))
-		assert.NoError(t, err)
-		assert.Equal(t, []string{"8.8.8.8:53"}, scanner.nameservers)
+		require.NoError(t, err)
+		require.Equal(t, []string{"8.8.8.8:53"}, scanner.nameservers)
 	})
 
 	t.Run("ValidNameserverWithoutPort", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithNameservers([]string{"8.8.8.8"}))
-		assert.NoError(t, err)
-		assert.Equal(t, []string{"8.8.8.8:53"}, scanner.nameservers)
+		require.NoError(t, err)
+		require.Equal(t, []string{"8.8.8.8:53"}, scanner.nameservers)
 	})
 
 	t.Run("ValidNameserverWithPortV6", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithNameservers([]string{"[2001:4860:4860::8888]:53"}))
-		assert.NoError(t, err)
-		assert.Equal(t, []string{"[2001:4860:4860::8888]:53"}, scanner.nameservers)
+		require.NoError(t, err)
+		require.Equal(t, []string{"[2001:4860:4860::8888]:53"}, scanner.nameservers)
 	})
 
 	t.Run("ValidNameserverWithoutPortV6", func(t *testing.T) {
 		scanner, err := New(logger, timeout, WithNameservers([]string{"2001:4860:4860::8888"}))
-		assert.NoError(t, err)
-		assert.Equal(t, []string{"[2001:4860:4860::8888]:53"}, scanner.nameservers)
+		require.NoError(t, err)
+		require.Equal(t, []string{"[2001:4860:4860::8888]:53"}, scanner.nameservers)
 	})
 }

@@ -34,7 +34,7 @@ type (
 	}
 )
 
-// GetMail returns the most recent mail found within the logged-in user's mailbox
+// GetMail returns the most recent mail found within the logged-in user's mailbox.
 func (s *Server) GetMail() (map[string]FoundMail, error) {
 	client, err := s.Login()
 	if err != nil {
@@ -75,7 +75,7 @@ func (s *Server) GetMail() (map[string]FoundMail, error) {
 		for headerScanner.Scan() {
 			if dkimFound {
 				if headerScanner.Text() != strings.TrimSpace(headerScanner.Text()) {
-					dkim = dkim + headerScanner.Text()
+					dkim += headerScanner.Text()
 				} else {
 					dkimDone = true
 					dkimFound = false
@@ -84,7 +84,7 @@ func (s *Server) GetMail() (map[string]FoundMail, error) {
 			if !dkimDone {
 				if strings.Contains(headerScanner.Text(), "DKIM-Signature") {
 					dkimFound = true
-					dkim = dkim + strings.Trim(headerScanner.Text(), "DKIM-Signature:")
+					dkim += strings.Trim(headerScanner.Text(), "DKIM-Signature:")
 				}
 			}
 		}
@@ -131,7 +131,7 @@ func (s *Server) GetMail() (map[string]FoundMail, error) {
 	return addresses, nil
 }
 
-// Login initializes an open session to the configured IMAP server
+// Login initializes an open session to the configured IMAP server.
 func (s *Server) Login() (*imapClient.Client, error) {
 	client, err := imapClient.DialTLS(s.config.Inbound.Host, nil)
 	if err != nil {
@@ -146,7 +146,7 @@ func (s *Server) Login() (*imapClient.Client, error) {
 }
 
 // SendMail takes a hermes.Email object, converts it into both html and plaintext,
-// and then send the email to the provided mailbox
+// and then send the email to the provided mailbox.
 func (s *Server) SendMail(mailbox string, result model.ScanResultWithAdvice) error {
 	html, plaintext, err := s.getMailContents(result)
 	if err != nil {

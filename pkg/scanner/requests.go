@@ -115,7 +115,7 @@ func (s *Scanner) getTypeBIMI(domain string) (string, error) {
 	} {
 		records, err := s.getDNSRecords(dname, dns.TypeTXT)
 		if err != nil {
-			return "", nil
+			return "", err
 		}
 
 		for index, record := range records {
@@ -137,7 +137,7 @@ func (s *Scanner) getTypeDKIM(domain string) (string, error) {
 	for _, selector := range selectors {
 		records, err := s.getDNSRecords(selector+"._domainkey."+domain, dns.TypeTXT)
 		if err != nil {
-			return "", nil
+			return "", err
 		}
 
 		for index, record := range records {
@@ -160,7 +160,7 @@ func (s *Scanner) getTypeDMARC(domain string) (string, error) {
 	} {
 		records, err := s.getDNSRecords(dname, dns.TypeTXT)
 		if err != nil {
-			return "", nil
+			return "", err
 		}
 
 		for index, record := range records {

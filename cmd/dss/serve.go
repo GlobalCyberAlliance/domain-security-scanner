@@ -68,7 +68,7 @@ var (
 			if advise {
 				server.Advisor = advisor.NewAdvisor(timeout, cache, checkTLS)
 			}
-			server.CheckTls = checkTLS
+			server.CheckTLS = checkTLS
 			server.Scanner = sc
 
 			server.Serve(port)
@@ -101,7 +101,7 @@ var (
 				log.Fatal().Err(err).Msg("could not open mail server connection")
 			}
 
-			mailServer.CheckTls = checkTLS
+			mailServer.CheckTLS = checkTLS
 
 			mailServer.Serve(interval)
 		},

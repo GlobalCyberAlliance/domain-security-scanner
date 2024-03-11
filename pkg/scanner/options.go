@@ -1,9 +1,11 @@
 package scanner
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -14,7 +16,7 @@ import (
 // OverwriteOption allows the caller to overwrite an existing option.
 func (s *Scanner) OverwriteOption(option Option) error {
 	if option == nil {
-		return fmt.Errorf("invalid option")
+		return errors.New("invalid option")
 	}
 
 	return option(s)
@@ -50,13 +52,13 @@ func WithConcurrentScans(quota uint16) Option {
 func WithDKIMSelectors(selectors ...string) Option {
 	return func(s *Scanner) error {
 		if len(selectors) == 0 {
-			return fmt.Errorf("no DKIM selectors provided")
+			return errors.New("no DKIM selectors provided")
 		}
 
 		// validate DKIM selectors
 		for _, selector := range selectors {
 			if err := validateDKIMSelector(selector); err != nil {
-				return fmt.Errorf("invalid DKIM selector: %s", err)
+				return fmt.Errorf("invalid DKIM selector: %w", err)
 			}
 		}
 
@@ -66,7 +68,7 @@ func WithDKIMSelectors(selectors ...string) Option {
 	}
 }
 
-// WithDNSBuffer increases the allocated buffer for DNS responses
+// WithDNSBuffer increases the allocated buffer for DNS responses.
 func WithDNSBuffer(bufferSize uint16) Option {
 	return func(s *Scanner) error {
 		if bufferSize <= 0 {
@@ -112,7 +114,7 @@ func WithNameservers(nameservers []string) Option {
 				return nil
 			}
 
-			nameservers = config.Servers[:]
+			nameservers = config.Servers
 		}
 
 		// Make sure each of the nameservers is in the "host:port" format.
@@ -150,7 +152,7 @@ func WithNameservers(nameservers []string) Option {
 			}
 		}
 
-		s.nameservers = nameservers[:]
+		s.nameservers = nameservers
 
 		return nil
 	}
@@ -159,7 +161,7 @@ func WithNameservers(nameservers []string) Option {
 func validateDKIMSelector(selector string) error {
 	switch {
 	case len(selector) == 0:
-		return fmt.Errorf("DKIM selector is empty")
+		return errors.New("DKIM selector is empty")
 	case len(selector) > 63:
 		return fmt.Errorf("DKIM selector length is %d, can't exceed 63", len(selector))
 	case selector[0] == '.' || selector[0] == '_':
@@ -169,8 +171,7 @@ func validateDKIMSelector(selector string) error {
 	}
 
 	for i, char := range selector {
-		switch {
-		case !((char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '-' || (char >= 'A' && char <= 'Z') || char == '.' || char == '_'):
+		if !regexp.MustCompile(`^[a-zA-Z0-9\-\._]$`).MatchString(string(char)) {
 			return fmt.Errorf("DKIM selector has invalid character '%c' at offset %d", char, i)
 		}
 	}
