@@ -17,6 +17,10 @@ import (
 	"github.com/spf13/cast"
 )
 
+const (
+	ErrInvalidDomain = "invalid domain name"
+)
+
 type (
 	Scanner struct {
 		// cache is a simple in-memory cache to reduce external requests from the scanner.
@@ -79,8 +83,8 @@ func New(logger zerolog.Logger, timeout time.Duration, opts ...Option) (*Scanner
 	dnsClient.Timeout = timeout
 
 	scanner := &Scanner{
-		dnsClient:   dnsClient, // Initialize a new dns.Client
-		dnsBuffer:   4096,      // Set the dnsBuffer size to 1024 bytes
+		dnsClient:   dnsClient,
+		dnsBuffer:   4096,
 		logger:      logger,
 		nameservers: []string{"8.8.8.8:53", "8.8.4.4:53", "1.1.1.1:53"}, // Set the default nameservers to Google and Cloudflare
 		poolSize:    uint16(runtime.NumCPU()),
@@ -167,7 +171,7 @@ func (s *Scanner) Scan(domains ...string) ([]*Result, error) {
 					// fill variable to satisfy deferred cache fill
 					result = &Result{
 						Domain: domainToScan,
-						Error:  "invalid domain name",
+						Error:  ErrInvalidDomain,
 					}
 
 					mutex.Lock()

@@ -3,11 +3,10 @@ package http
 import (
 	"context"
 	"fmt"
-	"net/http"
-
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/model"
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/scanner"
 	"github.com/danielgtaylor/huma/v2"
+	"net/http"
 )
 
 func (s *Server) registerScanRoutes() {
@@ -44,11 +43,15 @@ func (s *Server) registerScanRoutes() {
 			return nil, huma.Error500InternalServerError(fmt.Errorf("expected 1 result, got %d", len(results)).Error())
 		}
 
+		if results[0].Error == scanner.ErrInvalidDomain {
+			return nil, huma.Error400BadRequest(scanner.ErrInvalidDomain)
+		}
+
 		result := model.ScanResultWithAdvice{
 			ScanResult: results[0],
 		}
 
-		if s.Advisor != nil && result.ScanResult.Error == "" {
+		if s.Advisor != nil {
 			result.Advice = s.Advisor.CheckAll(result.ScanResult.Domain, result.ScanResult.BIMI, result.ScanResult.DKIM, result.ScanResult.DMARC, result.ScanResult.MX, result.ScanResult.SPF)
 		}
 
@@ -93,7 +96,7 @@ func (s *Server) registerScanRoutes() {
 				ScanResult: result,
 			}
 
-			if s.Advisor != nil && result.Error == "" {
+			if s.Advisor != nil && result.Error != scanner.ErrInvalidDomain {
 				res.Advice = s.Advisor.CheckAll(result.Domain, result.BIMI, result.DKIM, result.DMARC, result.MX, result.SPF)
 			}
 

@@ -26,6 +26,8 @@ var (
 		"google",        // Google
 		"selector1",     // Microsoft
 		"selector2",     // Microsoft
+		"s1",            // Generic
+		"s2",            // Generic
 		"k1",            // MailChimp
 		"mandrill",      // Mandrill
 		"everlytickey1", // Everlytic
@@ -91,6 +93,11 @@ func (s *Scanner) getDNSAnswers(domain string, recordType uint16) ([]dns.RR, err
 	}
 
 	if in.Rcode != dns.RcodeSuccess {
+		// disregard NXDOMAIN errors
+		if in.Rcode == dns.RcodeNameError {
+			return nil, nil
+		}
+
 		return nil, fmt.Errorf("DNS query failed with rcode %v", in.Rcode)
 	}
 

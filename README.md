@@ -1,8 +1,14 @@
 # Domain Security Scanner
-The Domain Security Scanner can be used to perform scans against domains for DKIM, DMARC, and SPF DNS records. You can also serve this functionality via an API, or a dedicated mailbox. A web application is also available if organizations would like to perform a single domain scan for DKIM, DMARC or SPF at [https://dmarcguide.globalcyberalliance.org](https://dmarcguide.globalcyberalliance.org).
+
+The Domain Security Scanner can be used to perform scans against domains for DKIM, DMARC, and SPF DNS records. You can
+also serve this functionality via an API, or a dedicated mailbox. A web application is also available if organizations
+would like to perform a single domain scan for DKIM, DMARC or SPF
+at [https://dmarcguide.globalcyberalliance.org](https://dmarcguide.globalcyberalliance.org).
 
 ## Download
-You can download pre-compiled binaries for macOS, Linux and Windows from the [releases](https://github.com/GlobalCyberAlliance/domain-security-scanner/releases) page.
+
+You can download pre-compiled binaries for macOS, Linux and Windows from
+the [releases](https://github.com/GlobalCyberAlliance/domain-security-scanner/releases) page.
 
 Alternatively, you can run the binary from within our pre-built Docker image:
 
@@ -23,6 +29,7 @@ make
 This will output a binary called `dss`. You can then move it or use it by running `./bin/dss` (on Unix devices).
 
 ## Find a Specific Record From a Single Domain
+
 To scan a domain for a specific type of record (A, AAAA, CNAME, DKIM, DMARC, MX, SPF, TXT), run:
 
 `dss scan [domain] --type dmarc`
@@ -35,7 +42,8 @@ Example:
 
 ## Bulk Scan Domains
 
-Scan any number of domains' DNS records. By default, this listens on `STDIN`, meaning you run the command via `dss scan` and then enter each domain one-by-one.
+Scan any number of domains' DNS records. By default, this listens on `STDIN`, meaning you run the command via `dss scan`
+and then enter each domain one-by-one.
 
 Alternatively, you can specify multiple domains at runtime:
 
@@ -49,13 +57,17 @@ See the [zonefile.example](zonefile.example) file in this repo.
 
 ## Serve REST API
 
-You can also expose the domain scanning functionality via a REST API. By default, this is rate limited to 3 requests per 3 second interval from a single IP address. Serve the API by running the following:
+You can also expose the domain scanning functionality via a REST API. By default, this is rate limited to 3 requests per
+3 second interval from a single IP address. Serve the API by running the following:
 
 `dss serve api --port 80`
 
-You can reach the API docs by visiting `http://server-ip:port/api/v1/docs` and the OpenAPI schema at `http://server-ip:port/api/v1/docs.json` or `http://server-ip:port/api/v1/docs.yaml`. You can also test requests through this interface thanks to [Scalar](https://github.com/scalar/scalar).
+You can reach the API docs by visiting `http://server-ip:port/api/v1/docs` and the OpenAPI schema
+at `http://server-ip:port/api/v1/docs.json` or `http://server-ip:port/api/v1/docs.yaml`. You can also test requests
+through this interface thanks to [Scalar](https://github.com/scalar/scalar).
 
-You can then get a single domain's results by submitting a GET request like this `http://server-ip:port/api/v1/scan/globalcyberalliance.org`, which will return a JSON response similar to this:
+You can then get a single domain's results by submitting a GET request like
+this `http://server-ip:port/api/v1/scan/globalcyberalliance.org`, which will return a JSON response similar to this:
 
 ```json
 {
@@ -98,7 +110,8 @@ You can then get a single domain's results by submitting a GET request like this
 }
 ```
 
-Alternatively, you can scan multiple domains by POSTing them to `http://server-ip:port/api/v1/scan` with a request body like this:
+Alternatively, you can scan multiple domains by POSTing them to `http://server-ip:port/api/v1/scan` with a request body
+like this:
 
 ```json
 {
@@ -199,6 +212,7 @@ dss serve mail --inboundHost "imap.gmail.com:993" --inboundPass "SomePassword" -
 You can then email this inbox from any address, and you'll receive an email back with your scan results.
 
 ### Global Flags
+
 | Flag             | Short | Description                                                                                                     |
 |------------------|-------|-----------------------------------------------------------------------------------------------------------------|
 | `--advise`       | `-a`  | Provide suggestions for incorrect/missing mail security features                                                |

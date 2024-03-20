@@ -189,7 +189,7 @@ func (a *Advisor) CheckBIMI(bimi string) (advice []string) {
 
 func (a *Advisor) CheckDKIM(dkim string) (advice []string) {
 	if dkim == "" {
-		return []string{"We couldn't detect any active DKIM record for your domain. Please visit https://dmarcguide.globalcyberalliance.org to fix this."}
+		return []string{"We couldn't detect any active DKIM record for your domain. Due to how DKIM works, we only lookup common/known DKIM selectors (such as x, selector1, google). Visit https://dmarcguide.globalcyberalliance.org for more info on how to configure DKIM for your domain."}
 	}
 
 	if strings.Contains(dkim, ";") {

@@ -2,12 +2,11 @@ package main
 
 import (
 	"bufio"
-	"os"
-
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/advisor"
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/model"
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/scanner"
 	"github.com/spf13/cobra"
+	"os"
 )
 
 func init() {
@@ -98,7 +97,7 @@ func printResult(result *scanner.Result, domainAdvisor *advisor.Advisor) {
 		ScanResult: result,
 	}
 
-	if result.Error == "" && advise {
+	if advise && result.Error != scanner.ErrInvalidDomain {
 		resultWithAdvice.Advice = domainAdvisor.CheckAll(result.Domain, result.BIMI, result.DKIM, result.DMARC, result.MX, result.SPF)
 	}
 

@@ -107,7 +107,7 @@ func (s *Server) handler() error {
 					ScanResult: result,
 				}
 
-				if s.advisor != nil || result.Error == "" {
+				if s.advisor != nil || result.Error != scanner.ErrInvalidDomain {
 					resultWithAdvice.Advice = s.advisor.CheckAll(result.Domain, result.BIMI, result.DKIM, result.DMARC, result.MX, result.SPF)
 				}
 
