@@ -234,7 +234,7 @@ func (s *Scanner) Scan(domains ...string) ([]*Result, error) {
 			scanWg.Wait()
 
 			if len(errs) > 0 {
-				result.Error = strings.Join(errs, ", ")
+				result.Error = strings.Join(errs, "; ")
 			}
 
 			mutex.Lock()
