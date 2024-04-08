@@ -74,7 +74,7 @@ func (s *Server) handler() error {
 				s.logger.Error().Err(err).Msg("could not obtain the latest mail from mail server")
 			}
 
-			var domainList []string
+			var dkimSelectors, domainList []string
 			for domain := range addresses {
 				cooldownDomain := s.cooldown.Get(domain)
 				if cooldownDomain != nil {
@@ -83,11 +83,21 @@ func (s *Server) handler() error {
 
 				s.cooldown.Set(domain, &domain)
 
+				if addresses[domain].DKIMSelector != "" {
+					dkimSelectors = append(dkimSelectors, addresses[domain].DKIMSelector)
+				}
+
 				domainList = append(domainList, domain)
 			}
 
 			if len(domainList) == 0 {
 				continue
+			}
+
+			if len(dkimSelectors) > 0 {
+				if err = s.Scanner.OverwriteOption(scanner.WithDKIMSelectors(dkimSelectors...)); err != nil {
+					s.logger.Error().Err(err).Msg("failed to override DKIM selectors for mail")
+				}
 			}
 
 			results, err := s.Scanner.Scan(domainList...)
@@ -98,10 +108,6 @@ func (s *Server) handler() error {
 
 			for _, result := range results {
 				sender := addresses[result.Domain].Address
-
-				if addresses[result.Domain].DKIM != "" {
-					result.DKIM = addresses[result.Domain].DKIM
-				}
 
 				resultWithAdvice := model.ScanResultWithAdvice{
 					ScanResult: result,

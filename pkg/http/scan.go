@@ -3,10 +3,11 @@ package http
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/model"
 	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/scanner"
 	"github.com/danielgtaylor/huma/v2"
-	"net/http"
 )
 
 func (s *Server) registerScanRoutes() {

@@ -29,8 +29,8 @@ type (
 	}
 
 	FoundMail struct {
-		Address string
-		DKIM    string
+		Address      string
+		DKIMSelector string
 	}
 )
 
@@ -98,9 +98,19 @@ func (s *Server) GetMail() (map[string]FoundMail, error) {
 			continue
 		}
 
+		if dkim != "" {
+			dkimHeaders := strings.Split(dkim, ";")
+			for _, dkimHeader := range dkimHeaders {
+				if strings.HasPrefix(dkimHeader, " s=") {
+					dkim = strings.TrimPrefix(dkimHeader, " s=")
+					break
+				}
+			}
+		}
+
 		addresses[msg.Envelope.From[0].HostName] = FoundMail{
-			Address: msg.Envelope.From[0].Address(),
-			DKIM:    dkim,
+			Address:      msg.Envelope.From[0].Address(),
+			DKIMSelector: dkim,
 		}
 		emailsToBeDeleted = append(emailsToBeDeleted, msg.SeqNum)
 	}
