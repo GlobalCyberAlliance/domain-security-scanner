@@ -119,7 +119,7 @@ func (s *Server) registerVersionRoute(version string) {
 		OperationID: "version",
 		Summary:     "Get the version of the API",
 		Method:      http.MethodGet,
-		Path:        s.apiPath + "version",
+		Path:        s.apiPath + "/version",
 		Tags:        []string{"Version"},
 	}, func(ctx context.Context, input *struct{}) (*VersionResponse, error) {
 		resp := VersionResponse{}
