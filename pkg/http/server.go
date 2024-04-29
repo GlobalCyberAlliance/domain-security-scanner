@@ -24,6 +24,7 @@ type Server struct {
 	apiPath string
 	logger  zerolog.Logger
 	router  huma.API
+	timeout time.Duration
 
 	Addr     string
 	CheckTLS bool
@@ -34,10 +35,11 @@ type Server struct {
 }
 
 // NewServer returns a new instance of Server.
-func NewServer(logger zerolog.Logger, version string) *Server {
+func NewServer(logger zerolog.Logger, timeout time.Duration, version string) *Server {
 	server := Server{
 		apiPath: "/api/v1",
 		logger:  logger,
+		timeout: timeout,
 	}
 
 	config := huma.DefaultConfig("Domain Security Scanner", version)
@@ -103,9 +105,14 @@ func (s *Server) Serve(port int) {
 	}
 
 	portString := cast.ToString(port)
+	httpServer := &http.Server{
+		Addr:         "0.0.0.0:" + portString,
+		Handler:      s.router.Adapter(),
+		WriteTimeout: 4 * s.timeout, // timeout is used by the scanner per request, so multiply it by 4 to allow for bulk requests
+	}
 
 	s.logger.Info().Msg("Starting api server on port " + portString)
-	s.logger.Fatal().Err(http.ListenAndServe("0.0.0.0:"+portString, s.router.Adapter())).Msg("an error occurred while hosting the api server")
+	s.logger.Fatal().Err(httpServer.ListenAndServe()).Msg("an error occurred while hosting the api server")
 }
 
 func (s *Server) registerVersionRoute(version string) {

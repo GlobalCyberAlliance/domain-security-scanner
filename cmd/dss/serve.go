@@ -64,7 +64,7 @@ var (
 				log.Fatal().Err(err).Msg("could not create domain scanner")
 			}
 
-			server := http.NewServer(log, cmd.Version)
+			server := http.NewServer(log, timeout, cmd.Version)
 			if advise {
 				server.Advisor = advisor.NewAdvisor(timeout, cache, checkTLS)
 			}

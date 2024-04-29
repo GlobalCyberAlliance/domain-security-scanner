@@ -26,7 +26,7 @@ var (
 		Use:     "dss",
 		Short:   "Scan a domain's DNS records.",
 		Long:    "Scan a domain's DNS records.\nhttps://github.com/GlobalCyberAlliance/domain-security-scanner",
-		Version: "3.0.11",
+		Version: "3.0.12",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			var logWriter io.Writer
 

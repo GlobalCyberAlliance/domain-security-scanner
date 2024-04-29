@@ -3,7 +3,7 @@ module github.com/GlobalCyberAlliance/domain-security-scanner
 go 1.22.0
 
 require (
-	github.com/danielgtaylor/huma/v2 v2.13.1
+	github.com/danielgtaylor/huma/v2 v2.14.0
 	github.com/emersion/go-imap v1.2.1
 	github.com/go-chi/chi/v5 v5.0.12
 	github.com/go-chi/cors v1.2.1
