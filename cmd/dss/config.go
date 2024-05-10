@@ -107,7 +107,7 @@ func (c *Config) Load() error {
 		log.Fatal().Err(err).Msg("unable to read config file")
 	}
 
-	if err = yaml.Unmarshal(configData, &cfg); err != nil {
+	if err = yaml.Unmarshal(configData, &c); err != nil {
 		log.Fatal().Err(err).Msg("unable to unmarshal config values")
 	}
 
