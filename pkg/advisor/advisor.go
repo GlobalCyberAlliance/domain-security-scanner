@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/cache"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/v3/pkg/cache"
 	"github.com/spf13/cast"
 )
 

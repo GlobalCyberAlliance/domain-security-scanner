@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/model"
-	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/scanner"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/v3/pkg/model"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/v3/pkg/scanner"
 	"github.com/danielgtaylor/huma/v2"
 )
 

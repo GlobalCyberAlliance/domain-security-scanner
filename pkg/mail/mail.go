@@ -7,7 +7,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/model"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/v3/pkg/model"
 	"github.com/emersion/go-imap"
 	imapClient "github.com/emersion/go-imap/client"
 	"github.com/spf13/cast"

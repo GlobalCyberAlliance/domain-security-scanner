@@ -6,8 +6,8 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/advisor"
-	"github.com/GlobalCyberAlliance/domain-security-scanner/pkg/scanner"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/v3/pkg/advisor"
+	"github.com/GlobalCyberAlliance/domain-security-scanner/v3/pkg/scanner"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"

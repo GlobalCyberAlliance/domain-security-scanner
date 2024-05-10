@@ -1,4 +1,4 @@
-PROJECT			 := github.com/GlobalCyberAlliance/domain-security-scanner
+PROJECT			 := github.com/GlobalCyberAlliance/domain-security-scanner/v3
 GO				 := $(shell which go 2>/dev/null)
 GOFIELDALIGNMENT := $(shell which fieldalignment 2>/dev/null)
 GOFUMPT			 := $(shell which gofumpt 2>/dev/null)
